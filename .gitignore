@@ -1,0 +1,58 @@
+# =========================================
+# 1. OBČUTLJIVI IN SKRITI PODATKI (KRITIČNO)
+# =========================================
+.env
+.env.local
+.env.*.local
+*.env
+secrets.json
+
+# =========================================
+# 2. PYTHON SPECIFIČNE DATOTEKE
+# =========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtualna okolja (če uporabljaš venv)
+venv/
+.venv/
+env/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =========================================
+# 3. NASTAVITVE RAZVOJNIH ORODIJ (IDEs)
+# =========================================
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+
+# Drugo
