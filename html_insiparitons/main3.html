@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nepremičninski Portal - SaaS Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans">
+
+    <div class="bg-emerald-600 text-white text-xs py-2 px-6 text-center font-medium">
+        🚀 Naš sistem trenutno spremlja <span class="font-bold">4.281 aktivnih oglasov</span> v realnem času.
+    </div>
+
+    <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <span class="text-xl font-black tracking-tight text-gray-900 flex items-center gap-1.5">
+            <span class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span> SCANNER<span class="text-emerald-600">.si</span>
+        </span>
+        <div class="flex items-center gap-4">
+            <button class="text-sm font-semibold text-gray-600 hover:text-gray-900">Statistika trga</button>
+            <button class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-100 transition">Primerjaj Cene</button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-wrap gap-3 items-center justify-between">
+            <div class="flex flex-wrap gap-2">
+                <button class="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg">Vsi oglasi</button>
+                <button class="px-4 py-2 text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg flex items-center gap-1.5">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full"></span> Novogradnje
+                </button>
+                <button class="px-4 py-2 text-sm font-medium bg-gray-50 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-100">Zadnjih 24h</button>
+            </div>
+            
+            <div class="text-sm text-gray-500">
+                Razvrsti po: <span class="font-bold text-gray-800 cursor-pointer hover:underline">Najnovejše prvo</span>
+            </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 mt-8">
+            <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition">
+                <div class="relative bg-gray-200 h-48">
+                    <div class="absolute inset-0 bg-cover bg-center" style="background-image: url('https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=500&q=80')"></div>
+                    <span class="absolute top-4 left-4 bg-emerald-500 text-white text-xs font-black uppercase px-2.5 py-1 rounded-md tracking-wider shadow-sm">Novogradnja</span>
+                </div>
+                <div class="p-5">
+                    <div class="text-xs font-bold uppercase tracking-wider text-gray-400">Ljubljana, Vič-Rudnik</div>
+                    <h3 class="text-lg font-bold text-gray-900 mt-1 truncate">Dvostanovanjska dvojčka, Trnovo</h3>
+                    <div class="flex items-center gap-4 text-sm text-gray-500 mt-3 font-medium">
+                        <span>📐 112 - 113 m²</span>
+                        <span>🏢 Letnik 2026</span>
+                    </div>
+                    <div class="border-t border-gray-100 mt-4 pt-4 flex items-center justify-between">
+                        <div class="text-xl font-black text-gray-900">547.522 €</div>
+                        <a href="#" class="text-sm font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">Poglej oglas →</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

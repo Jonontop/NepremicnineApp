@@ -4,30 +4,76 @@ export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-gray-700">
-        <Link href="/" className="text-sm text-blue-600 hover:underline font-medium">← Nazaj na začetno stran</Link>
+        <Link href="/" className="text-sm text-blue-600 hover:underline font-medium">
+          ← Nazaj na začetno stran
+        </Link>
         
-        <h1 className="text-3xl font-extrabold text-gray-900 mt-4 mb-6">Politika zasebnosti (Privacy Policy)</h1>
-        <p className="text-sm text-gray-500 mb-6">Zadnja posodobitev: {new Date().toLocaleDateString('sl-SI')}</p>
+        <h1 className="text-3xl font-extrabold text-gray-900 mt-4 mb-2">
+          Pravilnik o zasebnosti (Privacy Policy)
+        </h1>
+        <p className="text-sm text-gray-500 mb-6">
+          Zadnja posodobitev: {new Date().toLocaleDateString('sl-SI')}
+        </p>
 
         <section className="space-y-6">
+          {/* 1. Splošno */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">1. Zbiranje osebnih podatkov</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">1. Splošne informacije</h2>
             <p className="text-sm leading-relaxed">
-              Platforma SmartNepremičnine v trenutni fazi delovanja <strong>ne zbira</strong> in ne shranjuje osebnih podatkov obiskovalcev (kot so ime, e-pošta ali telefonska številka), saj za uporabo iskalnika registracija ni potrebna.
+              Upravljavec spletnega mesta <strong>Vesta.si</strong> (v nadaljevanju: "Portal") spoštuje vašo zasebnost in se zavezuje k varovanju osebnih podatkov v skladu s slovensko zakonodajo (ZVOP-2) in Splošno uredbo EU o varstvu podatkov (GDPR). Ta pravilnik pojasnjuje, kako Portal ravna s podatki med vašim obiskom.
             </p>
           </div>
 
+          {/* 2. Katere podatke zbiramo */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">2. Piškotki in lokalno shranjevanje</h2>
-            <p className="text-sm leading-relaxed">
-              Aplikacija lahko uporablja tehnologijo <code>localStorage</code> znotraj vašega brskalnika za shranjevanje vaših priljubljenih oglasov. Ti podatki ostanejo izključno na vaši napravi in se ne prenašajo na naše strežnike.
+            <h2 className="text-lg font-bold text-gray-900 mb-2">2. Katere podatke zbiramo in zakaj?</h2>
+            <p className="text-sm leading-relaxed mb-3">
+              Vesta.si deluje kot informacijski iskalnik in **ne zahteva registracije uporabnikov**. To pomeni, da med obiskom ne zbiramo vašega imena, priimka, telefonske številke, domačega naslova ali elektronske pošte.
+            </p>
+            <div className="text-sm leading-relaxed bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2">
+              <p className="font-semibold text-gray-900">Zbiramo le naslednje tehnične podatke:</p>
+              <ul className="list-disc list-inside space-y-1 text-gray-600">
+                <li><strong>Log datoteke strežnika:</strong> IP naslov (anonimiziran), vrsta brskalnika, operacijski sistem, čas dostopa in podstrani, ki jih obiščete. Ti podatki se zbirajo avtomatsko za zagotavljanje varnosti strežnika in preprečevanje zlorab (npr. DDoS napadov).</li>
+                <li><strong>Anonimna analitika:</strong> Spremljamo splošno obiskanost spletne strani (npr. koliko ljudi si ogleda določeno regijo), pri čemer so vsi podatki popolnoma združeni (agregirani) in vas ni mogoče osebno identificirati.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* 3. Podatki v oglasih */}
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">3. Osebni podatki znotraj nepremičninskih oglasov</h2>
+            <p className="text-sm leading-relaxed mb-2">
+              Ker Portal avtomatizirano indeksira javno dostopne nepremičninske oglase, se lahko v opisih oglasov ali kontaktnih podatkih pojavijo imena, telefonske številke ali elektronski naslovi kontaktnih oseb oziroma agentov, ki so jih **oglaševalci sami javno objavili** na izvornih straneh.
+            </p>
+            <p className="text-sm leading-relaxed text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+              ℹ️ <strong>Pomembno:</strong> Portal teh podatkov ne uporablja za lastne namene, jih ne obdeluje, ne shranjuje v samostojne zbirke osebnih podatkov in jih ne posreduje tretjim osebam. Prikazani so izključno z namenom pravilne preusmeritve kupca k izvornemu ponudniku oglasov.
             </p>
           </div>
 
+          {/* 4. Piškotki */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">3. Zunanji ponudniki</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">4. Piškotki (Cookies)</h2>
             <p className="text-sm leading-relaxed">
-              Naša baza podatkov gostuje na storitvi Supabase, ki zagotavlja visoke standarde varnosti in zaščite podatkov v skladu z evropsko zakonodajo (GDPR).
+              Portal uporablja le nujno potrebne sistemske piškotke, ki so potrebni za nemoteno tehnično delovanje spletnega mesta (npr. shranjevanje vaše izbire med temnim in svetlim načinom ali filtrirnih nastavitev za čas trajanja seje). Ne uporabljamo invazivnih piškotkov za sledenje vašim navadam na drugih spletnih straneh ali za ciljano oglaševanje tretjih oseb.
+            </p>
+          </div>
+
+          {/* 5. Vaše pravice */}
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">5. Vaše pravice (GDPR)</h2>
+            <p className="text-sm leading-relaxed mb-2">
+              Skladno z GDPR imate pravico do dostopa, popravka, izbrisa ali omejitve obdelave podatkov. 
+            </p>
+            <p className="text-sm leading-relaxed font-medium bg-gray-100 p-3 rounded-lg border border-gray-200">
+              Če ste nepremičninski agent ali zasebni oglaševalec in opazite, da so vaši kontaktni podatki (ki so bili prepisani iz javnega oglasa) prikazani na našem Portalu, vi pa tega ne želite, nam pišite na: <span className="text-blue-600 underline font-semibold">info@vesta.si</span>. Vaše kontaktne podatke ali oglas bomo nemudoma in trajno izbrisali iz našega sistema.
+            </p>
+          </div>
+
+          {/* 6. Spremembe */}
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">6. Spremembe pravilnika o zasebnosti</h2>
+            <p className="text-sm leading-relaxed">
+              Upravljavec si pridržuje pravico do posodobitve tega Pravilnika o zasebnosti. Vsaka sprememba bo objavljena na tej podstrani z navedbo datuma zadnje posodobitve.
             </p>
           </div>
         </section>

@@ -1,106 +1,141 @@
 import json
+import time
 from scrapers.base_scraper import BaseScraper
 
 class Si21Scraper(BaseScraper):
     def __init__(self):
         super().__init__(name="si21-nepremicnine", base_url="https://nepremicnine.si21.com")
 
-    def scrape(self, limit=5, buy=True, property_type="flat"):
+    def scrape(self, buy=True, **kwargs):
+        """
+        Popoln BULK zagon za Si21. Prebrska vse glavne tipe nepremičnin,
+        gre skozi celotno paginacijo (?strana=X) in zanesljivo detektira novogradnje.
+        """
         types_map = {
             "flat": "/stanovanje.v1",
             "house": "/hisa.v2",
             "business": "/poslovni-prostor.v3",
             "land": "/zemljisce.v5"
         }
-        action = 'prodaja.k1' if buy else 'oddaja.k2'
-        url = f"{self.base_url}/nepremicnine/{action}{types_map.get(property_type, '')}"
         
-        soup = self._get_soup(url)
-        if not soup:
-            return []
+        action = 'prodaja.k1' if buy else 'oddaja.k2'
+        vsi_oglasi = []
 
-        container = soup.find('div', class_='oglasi-list')
-        if not container:
-            return []
-            
-        # 1. Poiščemo vse oglasne kartice (tako navadne kot novogradnje/izpostavljene)
-        cards = container.find_all('a', class_=lambda c: c and ('simple-re-card' in c or 'ncom-re-card' in c))
-        data = []
+        # Tečemo čez vse definirane tipe nepremičnin
+        for prop_type, type_path in types_map.items():
+            page = 1
+            print(f"  [→] Si21: Strgam kategorijo: {prop_type} ({action})")
 
-        # 2. Tečemo čez kartice in za vsako vzamemo sliko ter njen pripadajoči naslednji <script>
-        for card in cards[:limit]:
-            try:
-                # --- PRIDOBIVANJE PODATKOV IZ <script> (naslednji brat element) ---
-                script_tag = card.find_next_sibling('script', type='application/ld+json')
-                if not script_tag:
-                    continue  # Če kartica nima pripadajočega skripta, jo preskočimo
-
-                parser = json.loads(script_tag.string)
+            while True:
+                # Si21 uporablja ?strana=X za paginacijo
+                url = f"{self.base_url}/nepremicnine/{action}{type_path}?strana={page}"
                 
-                # Osnovni podatki iz JSON-LD
-                title = parser.get('offers', {}).get('@type', "N/A")
-                land_desc = parser.get('name', "N/A")
-                link = parser.get('url', card.get('href', ''))
-                full_link = link if link.startswith("http") else self.base_url + link
+                soup = self._get_soup(url)
+                if not soup:
+                    break
+
+                container = soup.find('div', class_='oglasi-list')
+                if not container:
+                    break
+                    
+                # Poiščemo kartice na trenutni strani
+                cards = container.find_all('a', class_=lambda c: c and ('simple-re-card' in c or 'ncom-re-card' in c))
                 
-                # Lokacija
-                location_str = parser.get('about', {}).get('address', {}).get('addressLocality', "N/A")
-                
-                # Cena (Zanesljivo iz JSON ali kot fallback iz strukture)
-                raw_price = parser.get('offers', {}).get('price', 0)
-                if not raw_price and 'priceSpecification' in parser.get('offers', {}):
-                    # Nekatere novogradnje imajo ceno globlje v strukturi ali pa jo potegnemo iz HTML-ja
-                    price_text = card.find(class_='re-card-price') or card.find(class_='simple-re-card__price')
-                    raw_price = price_text.get_text(strip=True) if price_text else "0"
-                price = self.clean_price(raw_price)
+                if not cards:
+                    break  # Konec strani, izstop iz zanke
 
-                # Kvadratura
-                floor_size_data = parser.get('about', {}).get('floorSize', {})
-                if isinstance(floor_size_data, dict):
-                    raw_area = floor_size_data.get('value', 0.0)
-                else:
-                    # Fallback za kompleksnejše strukture (npr. min/max vrednosti pri novogradnjah)
-                    raw_area = parser.get('about', {}).get('additionalProperty', {}).get('minValue', 0.0)
-                area = self.clean_area(raw_area)
+                trenutna_stran_stevec = 0
 
-                # --- PRIDOBIVANJE SLIKE IZ KARTICE (image-wrapper) ---
-                img_src = ""
-                # Najprej poskusimo najti prvo sliko znotraj .image-wrapper-ja te kartice
-                img_tag = card.find('div', class_='image-wrapper')
-                if img_tag and img_tag.find('img'):
-                    img_src = img_tag.find('img').get('src', '')
-                
-                # Fallback: Če slike ni v HTML, preverimo še JSON-LD (novogradnje jo imajo tam)
-                if not img_src:
-                    img_src = parser.get('about', {}).get('image', '')
+                for card in cards:
+                    try:
+                        # Pridobivanje JSON-LD podatkov
+                        script_tag = card.find_next_sibling('script', type='application/ld+json')
+                        if not script_tag:
+                            continue  
 
-                # Popravimo relativne poti slik (npr. če se začnejo z // ali /)
-                if img_src:
-                    if img_src.startswith('//'):
-                        img_src = 'https:' + img_src
-                    elif img_src.startswith('/'):
-                        img_src = self.base_url + img_src
+                        parser = json.loads(script_tag.string)
+                        
+                        link = parser.get('url', card.get('href', ''))
+                        full_link = link if link.startswith("http") else self.base_url + link
+                        
+                        # Preprečevanje duplikatov
+                        if any(o['link'] == full_link for o in vsi_oglasi):
+                            continue
 
-                features_arr = []
-                # Če obstaja podatek o letu izgradnje, ga lahko vržemo med features
-                year_built = parser.get('about', {}).get('yearBuilt')
-                if year_built:
-                    features_arr.append(f"Letnik: {year_built}")
+                        title = parser.get('offers', {}).get('@type', "N/A")
+                        location_str = parser.get('about', {}).get('address', {}).get('addressLocality', "N/A")
+                        
+                        # Čiščenje cene (Zanesljivo rešuje tudi razpone z najinim novim clean_price)
+                        raw_price = parser.get('offers', {}).get('price', 0)
+                        if not raw_price and 'priceSpecification' in parser.get('offers', {}):
+                            price_text = card.find(class_='re-card-price') or card.find(class_='simple-re-card__price')
+                            raw_price = price_text.get_text(strip=True) if price_text else "0"
+                        price = self.clean_price(raw_price)
 
-                data.append({
-                    "site": self.name,
-                    "status": "prodaja" if buy else "oddaja",
-                    "type": property_type,
-                    "price": price,
-                    "location": location_str,
-                    "area": area,
-                    "features": features_arr,
-                    "link": full_link,
-                    "image": img_src
-                })
+                        # Kvadratura
+                        floor_size_data = parser.get('about', {}).get('floorSize', {})
+                        if isinstance(floor_size_data, dict):
+                            raw_area = floor_size_data.get('value', 0.0)
+                        else:
+                            # Fallback za novogradnje z min/max vrednostmi
+                            raw_area = parser.get('about', {}).get('additionalProperty', {}).get('minValue', 0.0)
+                        area = self.clean_area(raw_area)
 
-            except Exception as e:
-                print(f"Napaka pri parsiranju SI21 oglasa: {e}")
-                continue
+                        # Pridobivanje slike
+                        img_src = ""
+                        img_tag = card.find('div', class_='image-wrapper')
+                        if img_tag and img_tag.find('img'):
+                            img_src = img_tag.find('img').get('src', '')
+                        
+                        if not img_src:
+                            img_src = parser.get('about', {}).get('image', '')
 
-        return data
+                        if img_src:
+                            if img_src.startswith('//'):
+                                img_src = 'https:' + img_src
+                            elif img_src.startswith('/'):
+                                img_src = self.base_url + img_src
+
+                        features_arr = []
+                        year_built = parser.get('about', {}).get('yearBuilt')
+                        if year_built:
+                            features_arr.append(f"Letnik: {year_built}")
+
+                        # 🌟 LOGIKA ZA STRGANJE IN PREPOZNAVO NOVOGRADNJE NA SI21
+                        je_novogradnja = False
+                        
+                        # 1. indikator: Razred kartice vsebuje 'ncom-re-card' (New Commercial/Community Project)
+                        card_classes = card.get('class', [])
+                        if any('ncom-re-card' in cls for cls in card_classes):
+                            je_novogradnja = True
+                            
+                        # 2. indikator: Tekst znotraj kartice vsebuje besedo "prosto" (zelene značke v kotu)
+                        card_text = card.get_text(separator=" ").lower()
+                        if "prosto:" in card_text:
+                            je_novogradnja = True
+
+                        vsi_oglasi.append({
+                            "site": self.name,
+                            "status": "prodaja" if buy else "oddaja",
+                            "type": prop_type,
+                            "price": price,
+                            "location": location_str,
+                            "area": area,
+                            "features": features_arr,
+                            "link": full_link,
+                            "image": img_src,
+                            "novogradnja": je_novogradnja
+                        })
+                        trenutna_stran_stevec += 1
+
+                    except Exception as e:
+                        continue
+
+                if trenutna_stran_stevec == 0:
+                    break
+
+                print(f"    [Strana {page}] Nabranih {trenutna_stran_stevec} oglasov.")
+                page += 1
+                time.sleep(0.5) # Nežna pavza med podstranmi na istem portalu
+
+        return vsi_oglasi

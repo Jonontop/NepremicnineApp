@@ -34,28 +34,38 @@ class BaseScraper:
             return None
 
     def clean_price(self, price_text):
-        """Pretvori tekstualno ceno v celo število, pravilno odstrani decimalne cente."""
+        """ Pretvori tekstualno ceno v celo število in pravilno reši razpone (npr. 547.522 - 591.067 €) """
         if not price_text or price_text == "N/A":
             return 0
         if isinstance(price_text, int):
-            return price_text
+            return price_text if price_text < 50000000 else 0
         
-        # Pretvori v string in očisti morebitne presledke na začetku/koncu
         price_str = str(price_text).strip()
         
-        # POPRAVEK ZA SIOL IN PODOBNE (npr. "340.000,00 €")
-        # Če string vsebuje vejico, preverimo, ali gre za decimalna mesta na koncu
+        # 🌟 REŠITEV ZA RAZPONE (Novogradnje): 
+        # Če string vsebuje vezaj/črtico (-, –, —), pomeni da gre za razpon cen!
+        # Splitamo ob vezaju in vzamemo samo PRVI del (minimalno ceno).
+        for separator in ['-', '–', '—']:
+            if separator in price_str:
+                price_str = price_str.split(separator)[0].strip()
+                break # Uspešno smo zgrabili začetno ceno, gremo naprej na čiščenje
+
+        # Popravek za decimalne cente (če obstajajo za vejico)
         if ',' in price_str:
-            # Splitamo ob vejici na levi in desni del
             parts = price_str.split(',')
-            # Če je na desni strani nekaj, kar se začne z dvema številkama (centi), vzamemo samo levi del
-            # primer: "340.000" in "00 €" -> vzamemo "340.000"
             if len(parts) > 1 and len(parts[1].strip().split()[0]) == 2:
                 price_str = parts[0]
 
-        # Sedaj varno poberemo samo številke
+        # Sedaj varno poberemo številke samo iz PRVEGA dela cene
         numeric_price = ''.join(filter(str.isdigit, price_str))
-        return int(numeric_price) if numeric_price else 0
+        cena = int(numeric_price) if numeric_price else 0
+        
+        # Končna varovalka za ekstremne sistemske napake
+        if cena > 50000000:
+            print(f"⚠️ [Opozorilo] Zaznana nerealna cena ({cena} €). Nastavljam na 0.")
+            return 0
+            
+        return cena
 
     def clean_area(self, area_text):
         """Pretvori tekstualno kvadraturo v float."""
@@ -85,6 +95,8 @@ class BaseScraper:
             data["image"] = img_meta["content"].strip()
             
         return data
+
+    
 
     def scrape(self, limit=5, buy=True, property_type="flat", **kwargs):
         raise NotImplementedError("Vsak scraper mora implementirati svojo 'scrape' metodo!")

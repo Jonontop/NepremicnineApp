@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import Link from 'next/link';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faBuilding, faHome, faMapMarkerAlt, faEuroSign, 
+  faBuilding, faHome, faMapMarkerAlt,
   faSortAmountDown, faRulerCombined, faTag, faSearch, 
-  faHeart, faChartBar, faPlusCircle, faSlidersH, faEye, faArrowLeft
+  faEye, faArrowLeft
 } from '@fortawesome/free-solid-svg-icons';
 
 interface Listing {
@@ -23,15 +23,18 @@ interface Listing {
   image?: string;
   features?: string[];
   posodobljeno_ob?: string;
-  weight?: number; // Nov stolpec za težo oglasov
+  weight?: number;
 }
+
+const extractRegion = (location?: string) =>
+  (location || '').split(',')[0].trim();
 
 function SearchContent() {
   const searchParams = useSearchParams();
   
   const [listings, setListings] = useState<Listing[]>([]);
-  const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   const [filters, setFilters] = useState({
     action: searchParams.get('action') || 'vse',
@@ -42,31 +45,87 @@ function SearchContent() {
     sortBy: 'newest'
   });
 
+  const locationOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(
+        listings
+          .map((item) => item.location?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    );
+    return values.sort((a, b) => a.localeCompare(b, 'sl'));
+  }, [listings]);
+
+  const groupedLocations = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const location of locationOptions) {
+      const region = extractRegion(location) || 'Ostalo';
+      if (!groups.has(region)) groups.set(region, []);
+      groups.get(region)!.push(location);
+    }
+    return Array.from(groups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], 'sl'))
+      .map(([region, values]) => ({
+        region,
+        values: values.sort((a, b) => a.localeCompare(b, 'sl')),
+      }));
+  }, [locationOptions]);
+
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('nepremicnine_oglasi')
-        .select('*');
-
-      if (error) {
-        console.error('Napaka pri pridobivanju oglasov:', error);
-      } else {
+      try {
+        const { data, error } = await supabase
+          .from('nepremicnine_oglasi')
+          .select('*');
+        if (error) {
+          throw error;
+        }
         setListings((data as Listing[]) || []);
+      } catch (error) {
+        console.error('Napaka pri pridobivanju oglasov:', error);
       }
       setLoading(false);
     }
     fetchListings();
   }, []);
 
-  const applyFiltersAndSort = (allListings: Listing[]) => {
-    let temp = [...allListings];
+  useEffect(() => {
+    const resolveTheme = (): 'light' | 'dark' => {
+      const storedTheme = window.localStorage.getItem('theme');
+      if (storedTheme === 'dark' || storedTheme === 'light') return storedTheme;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
+    const timer = window.setTimeout(() => {
+      setTheme(resolveTheme());
+    }, 0);
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onMediaChange = () => {
+      const storedTheme = window.localStorage.getItem('theme');
+      if (!storedTheme) setTheme(media.matches ? 'dark' : 'light');
+    };
+    media.addEventListener('change', onMediaChange);
+
+    return () => {
+      window.clearTimeout(timer);
+      media.removeEventListener('change', onMediaChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const filteredListings = useMemo(() => {
+    let temp = [...listings];
 
     if (filters.action !== 'vse') {
       temp = temp.filter(item => item.status?.toLowerCase().includes(filters.action.toLowerCase()));
     }
     if (filters.location.trim() !== '') {
-      temp = temp.filter(item => item.location.toLowerCase().includes(filters.location.toLowerCase()));
+      temp = temp.filter(item => item.location?.toLowerCase().includes(filters.location.toLowerCase()));
     }
     if (filters.minPrice !== '') {
       temp = temp.filter(item => item.price !== null && item.price >= Number(filters.minPrice));
@@ -74,17 +133,9 @@ function SearchContent() {
     if (filters.maxPrice !== '') {
       temp = temp.filter(item => item.price !== null && item.price <= Number(filters.maxPrice));
     }
-
-    // PAMETNO SORTIRANJE: Najprej primarna teža (promocije na vrh, zgrešeni na dno), nato izbran filter
+    
+    // Razvrstitev glede na izbran kriterij
     temp.sort((a, b) => {
-      const weightA = a.weight ?? 0;
-      const weightB = b.weight ?? 0;
-      
-      if (weightA !== weightB) {
-        return weightB - weightA; // Višja teža gre na vrh
-      }
-
-      // Če imata isto težo, sortiraj po uporabnikovem izboru
       if (filters.sortBy === 'newest') {
         return new Date(b.posodobljeno_ob || 0).getTime() - new Date(a.posodobljeno_ob || 0).getTime();
       } else if (filters.sortBy === 'price_asc') {
@@ -97,59 +148,59 @@ function SearchContent() {
       return 0;
     });
 
-    setFilteredListings(temp);
-  };
-
-  useEffect(() => {
-    if (listings.length > 0) {
-      applyFiltersAndSort(listings);
-    }
+    return temp;
   }, [listings, filters]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    applyFiltersAndSort(listings);
   };
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
   };
+  const isDark = theme === 'dark';
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-gray-900">
+      <div className={`flex justify-center items-center h-screen ${isDark ? 'bg-[#0f172a]' : 'bg-slate-100'}`}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Nalagam najnovejše nepremičnine...</p>
+          <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className={`text-2xl font-medium ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>Nalagam najnovejše nepremičnine...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div className={`flex flex-col min-h-screen ${isDark ? 'bg-[#0f172a] text-slate-100' : 'bg-slate-100 text-slate-900'} selection:bg-amber-300 selection:text-slate-900`}>
       
       {/* NAVBAR */}
-      <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50 shadow-sm transition-colors duration-300">
+      <nav className={`${isDark ? 'bg-[#0f172a]/90 border-slate-800' : 'bg-white/90 border-slate-200'} border-b sticky top-0 z-50 backdrop-blur-md shadow-sm transition-all`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between h-20">
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition">
+              <Link href="/" className={`${isDark ? 'text-slate-300 hover:text-white' : 'text-slate-500 hover:text-slate-900'} transition-colors text-lg`}>
                 <FontAwesomeIcon icon={faArrowLeft} />
               </Link>
-              <span className="text-xl font-bold text-blue-600 dark:text-blue-400 tracking-tight flex items-center gap-2">
-                <FontAwesomeIcon icon={faHome} className="text-2xl" /> 
-                <span className="hidden sm:inline">Smart</span>Nepremičnine
+              <span className={`text-2xl font-bold tracking-tight flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br from-amber-400 to-amber-600 shadow-md">
+                  <FontAwesomeIcon icon={faHome} className="text-slate-950 text-base" /> 
+                </div>
+                <div>
+                  <span className={`font-semibold hidden sm:inline ${isDark ? 'text-white' : 'text-slate-900'}`}>vesta.si</span>
+                </div>
               </span>
             </div>
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <button className="px-3 py-2 rounded-md text-sm font-medium text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-400 transition flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faSearch} className="text-xs" /> Iskalnik
+              <button
+                onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+                className={`${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-700'} px-3 py-2 rounded-xl text-sm border`}
+              >
+                {isDark ? 'Dark' : 'Light'}
               </button>
-              {/* Ostali gumbi ostanejo enaki, prilagojeni za dark mode */}
-              <button className="hidden md:flex px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition items-center gap-1.5">
-                <FontAwesomeIcon icon={faPlusCircle} className="text-xs" /> Novogradnje
+              <button className="px-4 py-2 rounded-xl text-sm font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 shadow-inner flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faSearch} className="text-xs" /> Iskalnik
               </button>
             </div>
           </div>
@@ -157,16 +208,21 @@ function SearchContent() {
       </nav>
 
       {/* VRSTICA ZA FILTRE */}
-      <section className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 py-4 shadow-sm transition-colors duration-300">
+      <section className={`${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border-b py-6 shadow-sm`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <form onSubmit={handleSearchSubmit} className="flex flex-col lg:flex-row gap-3 items-end lg:items-center">
+          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
             
             {/* Tip posla */}
-            <div className="w-full lg:w-auto flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <FontAwesomeIcon icon={faTag} className="text-[10px]" /> Tip posla
               </label>
-              <select name="action" value={filters.action} onChange={handleFilterChange} className="w-full lg:w-48 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm rounded-lg p-2.5 font-medium outline-none focus:ring-2 focus:ring-blue-500">
+              <select 
+                name="action" 
+                value={filters.action} 
+                onChange={handleFilterChange} 
+                className={`w-full border text-sm font-medium rounded-xl p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-300 text-slate-800'}`}
+              >
                 <option value="vse">Vse (Prodaja/Oddaja)</option>
                 <option value="prodaja">Prodaja</option>
                 <option value="oddaja">Oddaja</option>
@@ -174,40 +230,75 @@ function SearchContent() {
             </div>
 
             {/* Lokacija */}
-            <div className="w-full lg:flex-1 flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <FontAwesomeIcon icon={faMapMarkerAlt} className="text-[10px]" /> Lokacija
               </label>
               <div className="relative w-full">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
                   <FontAwesomeIcon icon={faMapMarkerAlt} className="text-sm" />
                 </div>
-                <input type="text" name="location" value={filters.location} onChange={handleFilterChange} placeholder="Npr. Ljubljana, Maribor..." className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm rounded-lg pl-9 p-2.5 outline-none focus:ring-2 focus:ring-blue-500" />
+                <select 
+                  name="location" 
+                  value={filters.location} 
+                  onChange={handleFilterChange} 
+                className={`w-full border text-sm font-medium rounded-xl pl-9 p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-300 text-slate-800'}`}
+                >
+                  <option value="">Vse lokacije</option>
+                  {groupedLocations.map((group) => (
+                    <optgroup key={group.region} label={group.region}>
+                      {group.values.map((loc) => (
+                        <option key={loc} value={loc}>
+                          {loc}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Cene */}
-            <div className="w-full lg:w-auto flex gap-2">
-              <div className="flex-1 lg:w-28 flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                  <FontAwesomeIcon icon={faEuroSign} className="text-[10px]" /> Min
+            {/* Cenovni filtri */}
+            <div className="flex gap-2">
+              <div className="w-full flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Min €
                 </label>
-                <input type="number" name="minPrice" value={filters.minPrice} onChange={handleFilterChange} placeholder="Min €" className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" />
+                <input 
+                  type="number" 
+                  name="minPrice" 
+                  value={filters.minPrice} 
+                  onChange={handleFilterChange} 
+                  placeholder="Min" 
+                  className={`w-full border placeholder:text-slate-400 text-sm font-medium rounded-xl p-3 outline-none focus:border-amber-400 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-300 text-slate-800'}`} 
+                />
               </div>
-              <div className="flex-1 lg:w-28 flex flex-col gap-1">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                  <FontAwesomeIcon icon={faEuroSign} className="text-[10px]" /> Max
+              <div className="w-full flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Max €
                 </label>
-                <input type="number" name="maxPrice" value={filters.maxPrice} onChange={handleFilterChange} placeholder="Max €" className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" />
+                <input 
+                  type="number" 
+                  name="maxPrice" 
+                  value={filters.maxPrice} 
+                  onChange={handleFilterChange} 
+                  placeholder="Max" 
+                  className={`w-full border placeholder:text-slate-400 text-sm font-medium rounded-xl p-3 outline-none focus:border-amber-400 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-300 text-slate-800'}`} 
+                />
               </div>
             </div>
 
             {/* Sortiranje */}
-            <div className="w-full lg:w-auto flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                <FontAwesomeIcon icon={faSortAmountDown} className="text-[10px]" /> Razvrsti po
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <FontAwesomeIcon icon={faSortAmountDown} className="text-[10px]" /> Razvrstitev
               </label>
-              <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className="w-full lg:w-48 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-sm rounded-lg p-2.5 font-medium text-blue-600 dark:text-blue-400 outline-none focus:ring-2 focus:ring-blue-500">
+              <select 
+                name="sortBy" 
+                value={filters.sortBy} 
+                onChange={handleFilterChange} 
+                className={`w-full border text-sm font-bold rounded-xl p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer ${isDark ? 'bg-slate-800 border-slate-700 text-amber-300' : 'bg-slate-50 border-slate-300 text-amber-700'}`}
+              >
                 <option value="newest">Najnovejši najprej</option>
                 <option value="price_asc">Cena: od najnižje</option>
                 <option value="price_desc">Cena: od najvišje</option>
@@ -215,84 +306,79 @@ function SearchContent() {
               </select>
             </div>
 
-            <div className="w-full lg:w-auto pt-5 lg:pt-0">
-              <button type="submit" className="w-full lg:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg px-6 py-2.5 transition shadow-sm flex items-center justify-center gap-2🛟">
-                <FontAwesomeIcon icon={faSearch} /> Išči
-              </button>
-            </div>
           </form>
         </div>
       </section>
 
-      {/* MREŽA Z OGLASI Z INTERAKTIVNIMI HOVER EFEKTI */}
+      {/* REZULTATI */}
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Prikazanih <span className="font-bold text-gray-800 dark:text-gray-200">{filteredListings.length}</span> oglasov
+        <div className={`mb-6 flex justify-between items-center border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} pb-3`}>
+          <p className={`text-sm font-medium uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            Najdeno: <span className="font-bold text-lg text-amber-600 normal-case ml-1">{filteredListings.length}</span> oglasov
           </p>
+          <span className={`text-[11px] font-mono tracking-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Tabela: public.nepremicnine_oglasi</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredListings.map((listing) => (
-            <div 
-              key={listing.id} 
-              className="bg-white dark:bg-gray-950 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 flex flex-col shadow-sm transform transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 group"
-            >
-              {/* Slikovni del */}
-              <div className="h-48 w-full bg-gray-200 dark:bg-gray-800 relative overflow-hidden">
-                {listing.image ? (
-                  <img 
-                    src={listing.image} 
-                    alt={listing.location} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-900 flex-col gap-1">
-                    <FontAwesomeIcon icon={faBuilding} className="text-2xl text-gray-300 dark:text-gray-700" />
-                    <span className="text-xs">Ni slike</span>
-                  </div>
-                )}
-                
-                {/* Značka za promocijo (če ima veliko težo) */}
-                {(listing.weight && listing.weight > 0) && (
-                  <span className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow-sm">
-                    Izpostavljeno
-                  </span>
-                )}
-
-                <span className="absolute top-3 right-3 bg-gray-900/80 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium tracking-wide">
-                  {listing.site}
-                </span>
-              </div>
-
-              {/* Tekstovni del */}
-              <div className="p-5 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 truncate max-w-[65%]" title={listing.location}>
-                      <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400 mr-1 text-sm inline" /> {listing.location}
-                    </h2>
-                    <span className="text-lg font-extrabold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                      {listing.price ? `${Number(listing.price).toLocaleString('sl-SI')} €` : 'Po dogovoru'}
-                    </span>
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredListings.map((listing) => {
+            return (
+              <div 
+                key={listing.id} 
+                className={`${isDark ? 'bg-[#0b1838] border-slate-800/40' : 'bg-white border-slate-300'} rounded-3xl overflow-hidden border flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-amber-300/40 group shadow-[0_4px_30px_rgba(0,0,0,0.25)]`}
+              >
+                {/* Slika */}
+                <div className="h-60 w-full bg-slate-950 relative overflow-hidden">
+                  {listing.image ? (
+                    <img src={listing.image} alt={listing.location} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white/20 bg-slate-950 flex-col gap-1.5">
+                      <FontAwesomeIcon icon={faBuilding} className="text-2xl text-white/10" />
+                      <span className="text-[10px] uppercase font-bold tracking-wider">Ni slike</span>
+                    </div>
+                  )}
                   
-                  <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    <span className="flex items-center gap-1">
-                      <FontAwesomeIcon icon={faRulerCombined} className="text-xs text-gray-400" /> {listing.area ? `${listing.area} m²` : '/'}
-                    </span>
-                    <span className="capitalize flex items-center gap-1">
-                      <FontAwesomeIcon icon={faTag} className="text-xs text-gray-400" /> {listing.status}
-                    </span>
-                  </div>
+                  <span className={`absolute top-3 right-3 backdrop-blur-md text-xs font-semibold px-3 py-1.5 rounded-lg tracking-wide ${isDark ? 'bg-slate-950/80 text-white/80 border border-white/10' : 'bg-white/90 text-slate-700 border border-slate-200'}`}>
+                    {listing.site}
+                  </span>
                 </div>
 
-                <a href={listing.link} target="_blank" rel="noopener noreferrer" className="block text-center bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm mt-auto shadow-sm flex items-center justify-center gap-2">
-                  <FontAwesomeIcon icon={faEye} /> Oglej si oglas
-                </a>
+                {/* Vsebina */}
+                <div className="p-7 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-3 gap-3">
+                      <h2 className={`text-xl font-medium line-clamp-2 leading-snug transition-colors ${isDark ? 'text-white group-hover:text-amber-300' : 'text-slate-900 group-hover:text-amber-700'}`} title={listing.location}>
+                        <FontAwesomeIcon icon={faMapMarkerAlt} className="text-slate-400 mr-1.5 text-sm inline" /> {listing.location || 'Neznana lokacija'}
+                      </h2>
+                      <span className={`text-2xl font-semibold whitespace-nowrap ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        {listing.price && listing.price > 0 ? `${Number(listing.price).toLocaleString('sl-SI')} €` : 'Po dogovoru'}
+                      </span>
+                    </div>
+                    
+                    <div className={`flex gap-6 text-base font-medium border-t pt-4.5 mb-5 ${isDark ? 'text-white/70 border-white/10' : 'text-slate-700 border-slate-200'}`}>
+                      <span className="flex items-center gap-2">
+                        <FontAwesomeIcon icon={faRulerCombined} className="text-base text-slate-400" /> {listing.area && listing.area > 0 ? `${listing.area} m²` : '/'}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        💶 {listing.price && listing.area && listing.area > 0 ? `${Math.round(Number(listing.price) / Number(listing.area)).toLocaleString('sl-SI')} €/m²` : '/'}
+                      </span>
+                      <span className="capitalize flex items-center gap-2">
+                        <FontAwesomeIcon icon={faTag} className="text-base text-slate-400" /> {listing.status || 'Prodaja'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <a 
+                    href={listing.link} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="block text-center bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider py-3.5 px-4 rounded-xl transition-all text-sm mt-auto shadow-lg shadow-amber-400/5 active:scale-[0.98] flex items-center justify-center gap-2"
+                  >
+                    <FontAwesomeIcon icon={faEye} /> Oglej si oglas
+                  </a>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </main>
     </div>
@@ -302,8 +388,8 @@ function SearchContent() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex justify-center items-center h-screen bg-[#0f172a]">
+        <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
     }>
       <SearchContent />
