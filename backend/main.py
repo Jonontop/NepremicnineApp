@@ -135,28 +135,105 @@ def popravi_manjkajoce_podatke():
     except Exception as e:
         print(f"[X] Kritična napaka med izvajanjem popravila: {e}")
 
+def send_admin_email(subject, body):
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = os.getenv("SMTP_PORT")
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    admin_email = os.getenv("ADMIN_EMAIL", "podpora@smartnepremicnine.si")
+
+    # If SMTP settings are not provided, we log it and skip sending
+    if not all([smtp_host, smtp_port, smtp_user, smtp_pass]):
+        print(f"[✉️ Admin Report] (SMTP not configured) Subject: {subject}\nBody: {body}")
+        return
+
+    import smtplib
+    from email.mime.text import MIMEText
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = smtp_user
+        msg['To'] = admin_email
+
+        with smtplib.SMTP(smtp_host, int(smtp_port)) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        print(f"[✓] Poročilo uspešno poslano administratorju na {admin_email}.")
+    except Exception as e:
+        print(f"[X] Napaka pri pošiljanju poročila administratorju: {e}")
+
 def save_to_database(listings):
     if not listings:
         print("\n[!] Ni novih oglasov za vpis v bazo.")
         return
 
+    valid_listings = []
+    for item in listings:
+        price = item.get('price')
+        location = item.get('location')
+        link = item.get('link')
+        site = item.get('site')
+        
+        if not price or price <= 0 or not location or location == "N/A" or not location.strip():
+            reason = []
+            if not price or price <= 0:
+                reason.append("cena je n/a ali 0")
+            if not location or location == "N/A" or not location.strip():
+                reason.append("kraj je n/a")
+            
+            reason_str = ", ".join(reason)
+            subject = f"Neveljaven oglas izločen: {site}"
+            body = f"Oglas na povezavi {link} je bil izločen.\nRazlog: {reason_str}.\n\nPodrobnosti:\n{json.dumps(item, indent=2, default=str)}"
+            send_admin_email(subject, body)
+            continue
+        
+        valid_listings.append(item)
+
+    if not valid_listings:
+        print("\n[!] Ni veljavnih oglasov za vpis v bazo.")
+        return
+
     query = """
-        INSERT INTO nepremicnine_oglasi (site, status, type, price, location, area, features, link, image, posodobljeno_ob)
+        INSERT INTO nepremicnine_oglasi (
+            site, status, type, price, price_unit, location, area, features,
+            link, image, novogradnja, leto_izgradnje, posodobljeno_ob
+        )
         VALUES %s
         ON CONFLICT (link) 
         DO UPDATE SET 
             price = EXCLUDED.price,
+            price_unit = EXCLUDED.price_unit,
+            location = EXCLUDED.location,
+            area = EXCLUDED.area,
+            features = EXCLUDED.features,
+            image = EXCLUDED.image,
+            novogradnja = EXCLUDED.novogradnja,
+            leto_izgradnje = EXCLUDED.leto_izgradnje,
             posodobljeno_ob = NOW();
     """
     data_to_insert = [
-        (item['site'], clean_status(item['status']), item['type'], item['price'], item['location'], item['area'], item['features'], item['link'], item['image'])
-        for item in listings
+        (
+            item['site'],
+            clean_status(item['status']),
+            item['type'],
+            item['price'],
+            item.get('price_unit', 'total'),
+            item['location'],
+            item['area'],
+            item['features'],
+            item['link'],
+            item['image'],
+            item.get('novogradnja', False),
+            item.get('leto_izgradnje')
+        )
+        for item in valid_listings
     ]
     try:
         print(f"\n[↑] Povezujem se s Supabase in osvežujem {len(data_to_insert)} oglasov...")
         conn = psycopg2.connect(DB_URI)
         cur = conn.cursor()
-        execute_values(cur, query, data_to_insert, template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())")
+        execute_values(cur, query, data_to_insert, template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())")
         conn.commit()
         cur.close()
         conn.close()
@@ -168,8 +245,6 @@ def save_to_database(listings):
 def celoten_zagon_strganja():
     print("\n=========================================")
     
-    # 🌟 ZAČASNI BULK UKREP: Dokler jutri ne predelava posameznih scraperjev na while-zanke, 
-    # jim tukaj preko limit=150 povečava doseg, da zajamejo čim več strani.
     scrapers = [
         GaleaScraper(),
         Si21Scraper(),
@@ -178,22 +253,23 @@ def celoten_zagon_strganja():
     ]
     all_listings = []
 
-    for scraper in scrapers:
-        print(f"\n[+] Poganjam vir: {scraper.name.upper()}")
-        try:
-            # Popolnoma avtomatizirana BULK scraperja brez omejitev parametrov
-            if scraper.name in ["galea", "si21-nepremicnine"]:
-                results = scraper.scrape(buy=True)
-            else:
-                # Ostale začasno pustiva z limiti, dokler jih ne posodobiva
-                results = scraper.scrape(limit=150, buy=True, property_type="flat")
-                
-            for item in results:
-                all_listings.append(item)
-            print(f"[✓] {scraper.name} vrnil {len(results)} oglasov za obdelavo.")
-            time.sleep(random.uniform(1.5, 3.5))
-        except Exception as e:
-            print(f"[X] Napaka pri izvajanju scraperja {scraper.name}: {e}")
+    for buy in [True, False]:
+        buy_str = "PRODAJA" if buy else "ODDAJA"
+        for scraper in scrapers:
+            print(f"\n[+] Poganjam vir: {scraper.name.upper()} ({buy_str})")
+            try:
+                # Popolnoma avtomatizirana BULK scraperja brez omejitev parametrov
+                if scraper.name in ["galea", "si21-nepremicnine"]:
+                    results = scraper.scrape(buy=buy)
+                else:
+                    results = scraper.scrape(limit=150, buy=buy, property_type="flat")
+                    
+                for item in results:
+                    all_listings.append(item)
+                print(f"[✓] {scraper.name} vrnil {len(results)} oglasov za obdelavo.")
+                time.sleep(random.uniform(1.5, 3.5))
+            except Exception as e:
+                print(f"[X] Napaka pri izvajanju scraperja {scraper.name}: {e}")
 
     # Shranimo vse v bazo (Trigger bo poskrbel za zgodovino cen)
     save_to_database(all_listings)

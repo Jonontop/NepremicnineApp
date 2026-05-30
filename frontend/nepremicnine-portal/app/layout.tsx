@@ -56,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="sl" className="scroll-smooth">
+  <html lang="sl" className="scroll-smooth" data-scroll-behavior="smooth">
       <body 
         suppressHydrationWarning 
         className={`${manrope.className} bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between`}
@@ -64,16 +64,16 @@ export default function RootLayout({
       >
         
         {/* Glavna vsebina (Landing ali Iskalnik) */}
-        <div className="flex-grow">
+        <div className="grow">
           {children}
         </div>
 
         {/* USKLAJEN IN RAZŠIRJEN PREMIUM FOOTER */}
-        <footer className="bg-slate-950 text-white/40 border-t border-white/5 pt-16 pb-8 px-4 sm:px-6">
+        <footer className="bg-slate-950 text-white/40 border-t border-white/5 pt-24 pb-12 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto">
             
             {/* Zgornja mreža */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 border-b border-white/10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 pb-16 border-b border-white/10">
               
               {/* O projektu / Brand */}
               <div className="col-span-2 md:col-span-1 space-y-4">
@@ -129,11 +129,11 @@ export default function RootLayout({
             </div>
             
             {/* Spodnji del s podpisom in različico */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 text-xs text-slate-500">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-10 text-xs text-slate-500">
               <div className="text-center sm:text-left">
                 &copy; {new Date().getFullYear()} vesta.si Slovenija. Vse pravice pridržane. Podatki so informativne narave.
               </div>
-              <div className="flex items-center gap-4 flex-shrink-0">
+              <div className="flex items-center gap-4 shrink-0">
                 <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded text-[10px] tracking-wider text-slate-400 font-mono">
                   v1.1.0
                 </span>

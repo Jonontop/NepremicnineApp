@@ -71,6 +71,7 @@ class Si21Scraper(BaseScraper):
                             price_text = card.find(class_='re-card-price') or card.find(class_='simple-re-card__price')
                             raw_price = price_text.get_text(strip=True) if price_text else "0"
                         price = self.clean_price(raw_price)
+                        price_unit = self.detect_price_unit(raw_price)
 
                         # Kvadratura
                         floor_size_data = parser.get('about', {}).get('floorSize', {})
@@ -100,6 +101,7 @@ class Si21Scraper(BaseScraper):
                         year_built = parser.get('about', {}).get('yearBuilt')
                         if year_built:
                             features_arr.append(f"Letnik: {year_built}")
+                        year_built = self.extract_year(year_built)
 
                         # 🌟 LOGIKA ZA STRGANJE IN PREPOZNAVO NOVOGRADNJE NA SI21
                         je_novogradnja = False
@@ -124,7 +126,9 @@ class Si21Scraper(BaseScraper):
                             "features": features_arr,
                             "link": full_link,
                             "image": img_src,
-                            "novogradnja": je_novogradnja
+                            "novogradnja": je_novogradnja,
+                            "price_unit": price_unit,
+                            "leto_izgradnje": year_built
                         })
                         trenutna_stran_stevec += 1
 

@@ -27,7 +27,14 @@ class SiolScraper(BaseScraper):
                 title = tag_title.get_text(strip=True) if tag_title else "N/A"
 
                 price_tag = item.find('div', class_='list-price')
-                price = self.clean_price(price_tag.get_text(strip=True) if price_tag else "N/A")
+                price_raw = price_tag.get_text(strip=True) if price_tag else "N/A"
+                price = self.clean_price(price_raw)
+                price_unit = self.detect_price_unit(price_raw)
+                
+                # If price is low (under 5000) or contains rental-specific terms, it counts as Oddaja
+                is_rent = "mesec" in price_raw.lower() or "najem" in price_raw.lower() or "/m" in price_raw.lower() or (price > 0 and price < 5000)
+                if is_rent:
+                    title = "Oddaja"
                 
                 text_p = item.find('p', class_='list-text')
                 land_desc = text_p.find_all('span')[0].get_text(strip=True) if text_p and text_p.find_all('span') else "N/A"
@@ -38,7 +45,11 @@ class SiolScraper(BaseScraper):
                 features_arr = []
 
                 area_tag = item.find('div', class_='list-meta')
-                area = self.clean_area(area_tag.get_text(strip=True) if area_tag else "N/A")
+                meta_text = area_tag.get_text(" ", strip=True) if area_tag else "N/A"
+                area = self.clean_area(meta_text)
+                year_built = self.extract_year(" ".join([meta_text, land_desc, location_str]))
+                if year_built:
+                    features_arr.append(f"Letnik: {year_built}")
 
                 thumb_a = item.find("a", class_="list-thumb")
                 img_src = thumb_a.img['src'] if thumb_a and thumb_a.img else ""
@@ -56,7 +67,9 @@ class SiolScraper(BaseScraper):
                     "area": area,
                     "features": features_arr,
                     "link": f"{self.base_url}/{clean_link}",
-                    "image": img_src
+                    "image": img_src,
+                    "price_unit": price_unit,
+                    "leto_izgradnje": year_built
                 })
             except Exception as e:
                 continue

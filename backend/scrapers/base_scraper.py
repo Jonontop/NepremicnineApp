@@ -76,6 +76,19 @@ class BaseScraper:
         area_text = str(area_text).replace(',', '.')
         match = re.search(r"[-+]?\d*\.\d+|\d+", area_text)
         return float(match.group()) if match else 0.0
+
+    def detect_price_unit(self, price_text):
+        """Vrne 'per_m2', kadar je cena zapisana kot cena na kvadratni meter."""
+        text = str(price_text or "").lower()
+        per_m2_markers = ["€/m", "eur/m", "euro/m", "/m2", "/m²", "m2", "m²"]
+        return "per_m2" if any(marker in text for marker in per_m2_markers) else "total"
+
+    def extract_year(self, text):
+        """Poišče realističen letnik gradnje v besedilu."""
+        if not text:
+            return None
+        match = re.search(r"\b(18[5-9]\d|19\d{2}|20[0-3]\d)\b", str(text))
+        return int(match.group(1)) if match else None
     
     def extract_detail_page(self, soup):
         """

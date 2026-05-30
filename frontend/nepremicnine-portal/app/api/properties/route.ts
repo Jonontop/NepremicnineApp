@@ -14,6 +14,10 @@ type RawListing = {
   features: string[] | null;
   posodobljeno_ob: string | null;
   weight: number | null;
+  novogradnja?: boolean | null;
+  leto_izgradnje?: number | null;
+  price_unit?: string | null;
+  title?: string | null;
 };
 
 type HomeProperty = {
@@ -22,6 +26,8 @@ type HomeProperty = {
   location: string;
   city: "Ljubljana" | "Maribor" | "Koper" | "Kranj" | "Celje";
   price: number;
+  priceUnit: "total" | "per_m2";
+  totalPrice: number;
   area: number;
   rooms: number;
   year: number;
@@ -44,6 +50,28 @@ const SUPPORTED_CITIES: HomeProperty["city"][] = [
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1560185007-5f0bb1866cab?auto=format&fit=crop&w=1200&q=80";
+
+function isValidListing(row: RawListing): boolean {
+  if (!row.price || row.price <= 0) return false;
+  if (!row.location || row.location.trim() === "" || row.location.trim().toLowerCase() === "n/a") return false;
+  return true;
+}
+
+function getPriceUnit(row: Pick<RawListing, "price_unit" | "features">): "total" | "per_m2" {
+  const unit = (row.price_unit || "").toLowerCase();
+  if (unit.includes("m2") || unit.includes("m²") || unit.includes("sqm")) return "per_m2";
+  const featureText = (row.features || []).join(" ").toLowerCase();
+  if (featureText.includes("€/m") || featureText.includes("eur/m") || featureText.includes("cena na m")) return "per_m2";
+  return "total";
+}
+
+function getTotalPrice(row: Pick<RawListing, "price" | "area" | "price_unit" | "features">): number {
+  const price = row.price ?? 0;
+  if (getPriceUnit(row) === "per_m2" && row.area && row.area > 0) {
+    return Math.round(price * row.area);
+  }
+  return price;
+}
 
 function pickCity(location: string | null): HomeProperty["city"] {
   const normalized = (location || "").toLowerCase();
@@ -77,6 +105,45 @@ function roomsFromArea(area: number): number {
   return 1;
 }
 
+/**
+ * Try to parse room count from the listing title or type field.
+ * Matches patterns like "2-sobno", "3-sobno", "garsonjera", "studio" etc.
+ */
+function parseRoomsFromText(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (t.includes("garsonjera") || t.includes("studio")) return 1;
+  const match = t.match(/(\d+)[- ]?sob/);
+  if (match) return Math.min(parseInt(match[1], 10), 5);
+  return null;
+}
+
+/**
+ * Try to parse year from features array. Looks for 4-digit year strings (1950-2030).
+ */
+function parseYearFromFeatures(features: string[] | null | undefined): number | null {
+  if (!features) return null;
+  for (const feat of features) {
+    const match = feat.match(/\b(19[5-9]\d|20[0-2]\d|203[0])\b/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return null;
+}
+
+function buildTitle(row: RawListing): string {
+  // Use the real type/title if available in type field
+  if (row.type && row.type.trim().length > 3 && !["prodaja", "oddaja", "najem"].includes(row.type.trim().toLowerCase())) {
+    return row.type.trim();
+  }
+  const type = mapType(row.type);
+  const typeLabel =
+    type === "hisa" ? "Hiša" :
+    type === "poslovni" ? "Poslovni prostor" :
+    type === "vikend" ? "Vikend" :
+    "Stanovanje";
+  return `${typeLabel} – ${row.location || "Slovenija"}`;
+}
+
 function mapHomeProperty(row: RawListing): HomeProperty {
   const weight = row.weight ?? 50;
   const status = (row.status || "prodaja").toLowerCase();
@@ -93,22 +160,37 @@ function mapHomeProperty(row: RawListing): HomeProperty {
       : status === "prodaja"
       ? "Prodaja"
       : "Oglas";
+  const isNovogradnja = row.novogradnja === true;
   const filterTag: HomeProperty["filterTag"] =
-    isPremium ? "premium" : "rabljeno";
-  const year = 2000 + (Number(String(row.id).slice(-2)) % 25);
+    isNovogradnja ? "novogradnje" : isPremium ? "premium" : "rabljeno";
+
+  // Parse rooms from title/type text first, fall back to area
+  const parsedRooms =
+    parseRoomsFromText(row.type) ??
+    parseRoomsFromText(row.title) ??
+    roomsFromArea(area);
+
+  // Prefer the database field, then parse year from features array.
+  const parsedYear =
+    row.leto_izgradnje ??
+    parseYearFromFeatures(row.features) ??
+    (2000 + (Number(String(row.id).slice(-2)) % 25));
+
   const type = mapType(row.type);
+  const priceUnit = getPriceUnit(row);
+  const totalPrice = getTotalPrice(row);
 
   return {
     id: String(row.id),
-    title: `${type === "hisa" ? "Hiša" : type === "poslovni" ? "Poslovni prostor" : type === "vikend" ? "Vikend" : "Stanovanje"} - ${
-      row.location || city
-    }`,
+    title: buildTitle(row),
     location: row.location || city,
     city,
     price: row.price ?? 0,
+    priceUnit,
+    totalPrice,
     area,
-    rooms: roomsFromArea(area),
-    year,
+    rooms: parsedRooms,
+    year: parsedYear,
     image: row.image || PLACEHOLDER_IMAGE,
     badgeType,
     badgeText,
@@ -141,7 +223,8 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient(url, key);
-  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 200) : 50;
+  // Allow larger fetches from the frontend (cap at 1000 to avoid overly large responses)
+  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 1000) : 50;
 
   let query = supabase.from("nepremicnine_oglasi").select("*");
 
@@ -157,7 +240,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const rows = (data || []) as RawListing[];
+  // Filter out invalid listings (price 0/null or location N/A/empty)
+  const allRows = (data || []) as RawListing[];
+  const rows = allRows.filter(isValidListing);
+
   if (view === "stats") {
     const { count: activeAdsCount, error: activeError } = await supabase
       .from("nepremicnine_oglasi")
@@ -189,7 +275,7 @@ export async function GET(request: Request) {
     const uniqueLocationsCount = new Set(
       (locations || [])
         .map((row) => row.location?.trim().toLowerCase())
-        .filter((value): value is string => Boolean(value))
+        .filter((value): value is string => Boolean(value) && value !== "n/a")
     ).size;
 
     const typeCounts = { poslovni: 0, zemljisca: 0, hise: 0, stanovanja: 0 };
