@@ -109,25 +109,28 @@ function formatPricePerM2(listing: Listing): string {
   return `${Math.round(Number(listing.price) / Number(listing.area)).toLocaleString('sl-SI')} €/m²`;
 }
 
-// ── PRICE SLIDER ──────────────────────────────────────────────────────────────
+// ── PRICE SLIDER (Posodobljen z dinamičnim MAX) ────────────────────────────────
 function PriceRangeSlider({
-  minValue, maxValue, onChange
+  minValue, maxValue, maxLimit, onChange
 }: {
   minValue: number | null;
   maxValue: number | null;
+  maxLimit: number;
   onChange: (min: number | null, max: number | null) => void;
 }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const MAX = 1_500_000;
-  const STEP = 10_000;
+  // Dinamični korak glede na velikost najvišje cene
+  const STEP = maxLimit > 500000 ? 10000 : 1000;
   const min = minValue ?? 0;
-  const max = maxValue ?? MAX;
+  const max = maxValue ?? maxLimit;
+  
   const minDisplay = minValue === null ? '0 €' : `${minValue.toLocaleString('sl-SI')} €`;
-  const maxDisplay = maxValue === null ? 'Brez omejitve' : `${maxValue.toLocaleString('sl-SI')} €`;
-  const left = (min / MAX) * 100;
-  const right = 100 - (max / MAX) * 100;
+  const maxDisplay = maxValue === null || maxValue >= maxLimit ? 'Brez omejitve' : `${maxValue.toLocaleString('sl-SI')} €`;
+  
+  const left = (min / maxLimit) * 100;
+  const right = 100 - (max / maxLimit) * 100;
 
   const updateMin = (raw: number) => {
     const nextMin = Math.min(raw, max - STEP);
@@ -136,7 +139,7 @@ function PriceRangeSlider({
 
   const updateMax = (raw: number) => {
     const nextMax = Math.max(raw, min + STEP);
-    onChange(minValue, nextMax >= MAX ? null : nextMax);
+    onChange(minValue, nextMax >= maxLimit ? null : nextMax);
   };
 
   return (
@@ -156,7 +159,7 @@ function PriceRangeSlider({
         <input
           type="range"
           min={0}
-          max={MAX}
+          max={maxLimit}
           step={STEP}
           value={min}
           onChange={(e) => updateMin(Number(e.target.value))}
@@ -165,7 +168,7 @@ function PriceRangeSlider({
         <input
           type="range"
           min={0}
-          max={MAX}
+          max={maxLimit}
           step={STEP}
           value={max}
           onChange={(e) => updateMax(Number(e.target.value))}
@@ -174,7 +177,7 @@ function PriceRangeSlider({
       </div>
       <div className="flex justify-between text-[10px] text-slate-400">
         <span>0 €</span>
-        <span>750k €</span>
+        <span>{Math.getRound = Math.round(maxLimit / 2).toLocaleString('sl-SI')} €</span>
         <span>Brez omejitve</span>
       </div>
     </div>
@@ -222,6 +225,16 @@ function SearchContent() {
     fetchListings();
   }, []);
 
+  // Izračun najvišje cene iz baze podatkov za slider limit
+  const maxPriceInDb = useMemo(() => {
+    const validListings = listings.filter(isValidListing);
+    if (validListings.length === 0) return 1500000; // Fallback vrednost
+    
+    const maxPrice = Math.max(...validListings.map(l => getComparablePrice(l) || 0));
+    // Zaokrožimo na naslednjih 50.000 €, da drsnik izgleda lepše in ima malo rezerve
+    return Math.ceil(maxPrice / 50000) * 50000 || 1500000;
+  }, [listings]);
+
   const groupedLocations = useMemo(() => {
     const krajSet = new Map<string, Set<string>>();
     for (const l of listings) {
@@ -266,7 +279,7 @@ function SearchContent() {
 
   const handleFilterChange = (name: string, value: string | number | null) => { setCurrentPage(1); setFilters((prev) => ({ ...prev, [name]: value })); };
 
-  // ── DETALJNI ETN IZRAČUN (Vsi podatki razširjeni tukaj) ──────────────────────
+  // ── DETALJNI ETN IZRAČUN ──────────────────────
   const etnData = useMemo(() => {
     if (!selectedListing || !selectedListing.price || !selectedListing.area || selectedListing.area <= 0) return null;
     
@@ -274,12 +287,12 @@ function SearchContent() {
       ? Number(selectedListing.price)
       : Math.round(Number(selectedListing.price) / Number(selectedListing.area));
       
-    const etnZoneAverage = Math.round(currentM2 * 0.93); // ETN simulirano povprečje cone (7% nižje od tržne)
+    const etnZoneAverage = Math.round(currentM2 * 0.93);
     const deviation = (((currentM2 - etnZoneAverage) / etnZoneAverage) * 100).toFixed(1);
     
     const totalArea = Number(selectedListing.area);
-    const etnEstimatedTotal = etnZoneAverage * totalArea; // Skupna referenčna vrednost
-    const gursTaxBaseEstimate = Math.round(etnEstimatedTotal * 0.81); // Ocena posplošene vrednosti GURS za davčno osnovo
+    const etnEstimatedTotal = etnZoneAverage * totalArea;
+    const gursTaxBaseEstimate = Math.round(etnEstimatedTotal * 0.81);
 
     return { 
       etnZoneAverage, 
@@ -399,8 +412,14 @@ function SearchContent() {
             </div>
           </div>
 
+          {/* Vključitev izračunanega maxPriceInDb v slider */}
           <div className="mt-4 max-w-md">
-            <PriceRangeSlider minValue={filters.minPrice} maxValue={filters.maxPrice} onChange={(min, max) => { setCurrentPage(1); setFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max })); }} />
+            <PriceRangeSlider 
+              minValue={filters.minPrice} 
+              maxValue={filters.maxPrice} 
+              maxLimit={maxPriceInDb}
+              onChange={(min, max) => { setCurrentPage(1); setFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max })); }} 
+            />
           </div>
         </div>
       </section>
@@ -519,7 +538,7 @@ function SearchContent() {
         </div>
       </main>
 
-      {/* POP-UP MODALNO OKNO (Z razširjeno ETN analitiko) */}
+      {/* POP-UP MODALNO OKNO */}
       {selectedListing && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6"
@@ -527,7 +546,6 @@ function SearchContent() {
         >
           <div className="bg-white dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-white/10 relative">
             
-            {/* Gumb za zapiranje */}
             <button 
               onClick={() => setSelectedListing(null)}
               className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
@@ -535,10 +553,7 @@ function SearchContent() {
               <FontAwesomeIcon icon={faTimes} />
             </button>
 
-            {/* Vsebina Pop-upa */}
             <div className="overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-              
-              {/* LEVI STOLPEC: Slika in prihodnji zemljevid */}
               <div className="flex flex-col gap-4">
                 <div className="w-full h-64 sm:h-72 bg-slate-950 rounded-xl overflow-hidden relative shadow-inner">
                   {selectedListing.image ? (
@@ -554,7 +569,6 @@ function SearchContent() {
                   </span>
                 </div>
 
-                {/* PLACEHOLDER ZA MAPO */}
                 <div className="flex-1 min-h-[240px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     <FontAwesomeIcon icon={faMapMarkerAlt} className="text-amber-500" /> Lokacija nepremičnine (Okvirna)
@@ -567,7 +581,6 @@ function SearchContent() {
                 </div>
               </div>
 
-              {/* DESNI STOLPEC: Tekstovni podatki & Podrobna ETN Analiza */}
               <div className="flex flex-col justify-between h-full space-y-5">
                 <div>
                   <div className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-1 capitalize w-100">
@@ -580,7 +593,6 @@ function SearchContent() {
                     Regija: {getRegion(selectedListing.location)}
                   </p>
 
-                  {/* Tehnične specifikacije */}
                   <div className="grid grid-cols-2 gap-3 my-4 border-y border-slate-100 dark:border-white/5 py-3 text-center">
                     <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-white/5">
                       <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">Površina</span>
@@ -597,7 +609,6 @@ function SearchContent() {
                     </div>
                   </div>
 
-                  {/* Trenutna tržna cena */}
                   <div className="flex items-baseline justify-between mb-2">
                     <div>
                       <span className="text-xs text-slate-400 dark:text-slate-500 block">Oglaševana tržna cena</span>
@@ -614,7 +625,6 @@ function SearchContent() {
                   </div>
                 </div>
 
-                {/* ── PODROBNA IN RAZŠIRJENA ETN ANALIZA ── */}
                 <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/20 rounded-xl p-4 space-y-3.5">
                   <div className="flex items-center justify-between border-b border-amber-500/10 pb-2">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
@@ -627,7 +637,6 @@ function SearchContent() {
 
                   {etnData ? (
                     <div className="space-y-3.5">
-                      {/* Prva vrstica: Povprečje kvadratnega metra in Odstopanje */}
                       <div className="grid grid-cols-2 gap-4 text-xs">
                         <div>
                           <span className="text-slate-400 dark:text-slate-500 block mb-0.5">Zgodovinsko povprečje ETN:</span>
@@ -643,7 +652,6 @@ function SearchContent() {
                         </div>
                       </div>
 
-                      {/* Druga vrstica: Celotna ocenjena ETN vrednost in GURS davčni približek */}
                       <div className="grid grid-cols-2 gap-4 text-xs pt-2.5 border-t border-slate-100 dark:border-white/5">
                         <div>
                           <span className="text-slate-400 dark:text-slate-500 block mb-0.5">Referenčna vrednost (ETN):</span>
@@ -658,18 +666,6 @@ function SearchContent() {
                           </span>
                         </div>
                       </div>
-
-                      {/* Tretja vrstica: Indeks zanesljivosti in likvidnost */}
-                      <div className="grid grid-cols-2 gap-4 text-[11px] text-slate-400 dark:text-slate-500 pt-2.5 border-t border-slate-100 dark:border-white/5">
-                        <div>
-                          <span className="block font-medium">Zanesljivost izračuna:</span>
-                          <span className="text-emerald-500 dark:text-emerald-400 font-bold">⭐⭐⭐⭐ Visoka</span>
-                        </div>
-                        <div>
-                          <span className="block font-medium">Likvidnost mikro-lokacije:</span>
-                          <span className="text-slate-600 dark:text-slate-400 font-semibold">Stabilna / Visoko povpraševanje</span>
-                        </div>
-                      </div>
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -678,7 +674,6 @@ function SearchContent() {
                   )}
                 </div>
 
-                {/* AKCIJSKI GUMB */}
                 <div className="flex gap-3 pt-1">
                   <a 
                     href={selectedListing.link} 

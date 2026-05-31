@@ -60,3 +60,9 @@
 - [ ] table for sellers (collect data about seller for future expansion && put id(or name unique) of seller in main table in db)
 - [ ] market statistics (remove anything connected for now from site)
 - [ ] prettify cards in search tab
+
+
+
+# FIX
+- language change
+- upper price limit

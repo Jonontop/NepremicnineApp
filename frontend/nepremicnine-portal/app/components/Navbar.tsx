@@ -123,12 +123,12 @@ export default function Navbar() {
           
 
           {/* 5. O projektu */}
-          <Link href="/#about" className="hover:text-amber-400 transition-colors">
+          <Link href="/about" className="hover:text-amber-400 transition-colors">
             {t.about}
           </Link>
 
           {/* 6. FAQ */}
-          <Link href="/#faq" className="hover:text-amber-400 transition-colors">
+          <Link href="/faq" className="hover:text-amber-400 transition-colors">
             {t.faq}
           </Link>
         </nav>
