@@ -4,15 +4,12 @@ import type { Metadata } from 'next';
 import { Manrope } from 'next/font/google';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faHome, 
-  faEnvelope, 
   faDatabase, 
   faCodeBranch, 
-  faSearch, 
-  faLayerGroup 
-} from '@fortawesome/free-solid-svg-icons'; // <--- Popravljeno na @fortawesome
+  faEnvelope 
+} from '@fortawesome/free-solid-svg-icons';
 import { ThemeProvider } from './ThemeProvider';
-import NavbarThemeToggle from './components/NavbarThemeToggle';
+import Navbar from './components/Navbar'; // <--- Uvoženo namesto starega statičnega headerja
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -69,50 +66,15 @@ export default function RootLayout({
       >
         <ThemeProvider>
           
-          {/* UNIVERZALNI PREMIUM NAVBAR */}
-          <header className="sticky top-0 z-50 w-full border-b backdrop-blur-md bg-white/80 border-slate-200 dark:bg-slate-900/80 dark:border-slate-800 transition-colors duration-300">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-              
-              {/* Logo / Brand */}
-              <Link href="/" className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-400 text-slate-950 font-black text-sm shadow-md shadow-amber-400/20">
-                  V
-                </div>
-                <span>vesta<span className="text-amber-500">.si</span></span>
-              </Link>
-
-              {/* Navigacijske povezave */}
-              <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                <Link href="/" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
-                  Domov
-                </Link>
-                <Link href="/search" className="flex items-center gap-1.5 hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
-                  Iskalnik
-                </Link>
-                <Link href="/#stats" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
-                  Statistika
-                </Link>
-              </nav>
-
-              {/* Desni del: Gumb za temo + Iskalni gumb akcija */}
-              <div className="flex items-center gap-4">
-                {/* Ločena klient komponenta za gumb teme, da celoten layout ostane Server Component */}
-                <NavbarThemeToggle />
-                
-                <Link href="/search" className="hidden sm:inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-amber-400 dark:hover:bg-amber-300 dark:text-slate-950 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm">
-                  Hitro Iskanje
-                </Link>
-              </div>
-
-            </div>
-          </header>
+          {/* DINAMIČNI INTERAKTIVNI NAVBAR */}
+          <Navbar />
 
           {/* Glavna vsebina (Landing ali Iskalnik) */}
           <div className="grow">
             {children}
           </div>
 
-          {/* USKLAJEN PREMIUM FOOTER */}
+          {/* FOOTER (Ostane točno tak kot je bil) */}
           <footer className="bg-slate-950 text-white/40 border-t border-white/5 pt-24 pb-12 px-4 sm:px-6">
             <div className="max-w-7xl mx-auto">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-10 pb-16 border-b border-white/10">

@@ -131,7 +131,7 @@ export default function EstateMS() {
           <div className="lg:col-span-5">
             <div className="flex items-center gap-3 mb-5">
               <span className="w-8 h-px bg-amber-400" />
-              <span className="text-amber-600 text-xs uppercase font-bold tracking-widest">Premium nepremičninski portal</span>
+              <span className="text-amber-300 text-xs uppercase font-bold tracking-widest drop-shadow-lg">Nepremičninski portal</span>
             </div>
             <h1 className="text-white drop-shadow-lg text-5xl sm:text-6xl lg:text-7xl font-semibold leading-[1.12] mb-6">
               Odkrijte bivalne<br />
@@ -247,14 +247,14 @@ export default function EstateMS() {
       </section>
 
       {/* ── KATEGORIJE TRGA ── */}
-      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24">
+      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24 bg-slate-300/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 mt-12">
         <h2 className="text-4xl font-bold mb-10 dark:text-white text-slate-900">Poiščite ponudbo glede na vrsto nepremičnine</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { key: 'poslovni', label: 'Poslovni prostori', img: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80' },
             { key: 'zemljisca', label: 'Zemljišča', img: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80' },
             { key: 'hise', label: 'Hiše', img: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80' },
-            { key: 'stanovanja', label: 'Stanovanja', img: 'https://images.unsplash.com/photo-1493666438817-866a91353ca9?auto=format&fit=crop&w=800&q=80' },
+            { key: 'stanovanja', label: 'Stanovanja', img: 'https://images.unsplash.com/photo-1597047084897-51e81819a499?auto=format&fit=crop&w=800&q=80' },
           ].map((item) => {
             const typeMap: Record<string, string> = { poslovni: 'poslovni', zemljisca: 'zemljisce', hise: 'hisa', stanovanja: 'stanovanje' };
             const typeParam = typeMap[item.key] ?? '';
