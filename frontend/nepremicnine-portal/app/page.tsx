@@ -18,6 +18,7 @@ interface Property {
   rooms: number;
   year: number;
   image: string;
+  link: string; // <-- Dodana povezava do izvorne strani agencije v bazi podatkov
   badgeType: 'emerald' | 'slate' | 'amber' | 'indigo';
   badgeText: string;
   isPremium?: boolean;
@@ -55,7 +56,7 @@ export default function EstateMS() {
   const [searchLocation, setSearchLocation] = useState<string>('');
   const [searchMinPrice, setSearchMinPrice] = useState<string>('');
   const [searchMaxPrice, setSearchMaxPrice] = useState<string>('');
-  const [selectedRooms, setSelectedRooms] = useState<number | null>(null); // Ponastavljeno na null za takojšen izris
+  const [selectedRooms, setSelectedRooms] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchTopProperties = async () => {
@@ -110,15 +111,15 @@ export default function EstateMS() {
 
   const getBadgeClass = (type: string) => {
     switch (type) {
-      case 'emerald': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'amber': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'indigo': return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
-      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+      case 'emerald': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+      case 'amber': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+      case 'indigo': return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20';
+      default: return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20';
     }
   };
 
   return (
-    <div className="min-h-screen transition-colors duration-200 dark:bg-[#0f172a] dark:text-slate-100 bg-slate-100 text-slate-900">
+    <div className="min-h-screen transition-colors duration-200 dark:bg-[#0f172a] dark:text-slate-100 bg-slate-50 text-slate-900">
       
       {/* ── HERO SECTION ── */}
       <section className="relative overflow-hidden py-20 lg:py-28 px-4 sm:px-6 border-b dark:border-slate-800 border-slate-200 bg-gradient-to-b dark:from-[#0f172a] dark:to-[#111827] from-white to-slate-100">
@@ -131,7 +132,7 @@ export default function EstateMS() {
           <div className="lg:col-span-5">
             <div className="flex items-center gap-3 mb-5">
               <span className="w-8 h-px bg-amber-400" />
-              <span className="text-amber-300 text-xs uppercase font-bold tracking-widest drop-shadow-lg">Nepremičninski portal</span>
+              <span className="text-amber-500 dark:text-amber-400 text-xs uppercase font-bold tracking-widest drop-shadow-lg">Nepremičninski portal</span>
             </div>
             <h1 className="text-white drop-shadow-lg text-5xl sm:text-6xl lg:text-7xl font-semibold leading-[1.12] mb-6">
               Odkrijte bivalne<br />
@@ -247,7 +248,7 @@ export default function EstateMS() {
       </section>
 
       {/* ── KATEGORIJE TRGA ── */}
-      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24 bg-slate-300/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 mt-12">
+      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24 bg-slate-200/40 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700 mt-12">
         <h2 className="text-4xl font-bold mb-10 dark:text-white text-slate-900">Poiščite ponudbo glede na vrsto nepremičnine</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
@@ -281,7 +282,10 @@ export default function EstateMS() {
       {/* ── PROPERTY GRID ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24" id="listings">
         <div className="flex items-center justify-between mb-10">
-          <h2 className="text-4xl font-bold dark:text-white text-slate-900">Najnovejša Premium Ponudba</h2>
+          <div>
+            <h2 className="text-4xl font-bold dark:text-white text-slate-900 tracking-tight">Najnovejša Premium Ponudba</h2>
+            <p className="text-sm text-slate-400 mt-1">Izbrana ekskluzivna ponudba nepremičnin v Sloveniji.</p>
+          </div>
         </div>
 
         {loading ? (
@@ -294,64 +298,129 @@ export default function EstateMS() {
             <p className="text-slate-400 text-base font-medium">V bazi trenutno ni top oglasov.</p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {properties.map((property) => {
-              const isLiked = favorites.includes(property.id);
-              const isHighWeightPremium = property.weight >= 80 || property.isPremium;
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {properties.map((property) => {
+                const isLiked = favorites.includes(property.id);
+                const isHighWeightPremium = property.weight >= 80 || property.isPremium;
+                
+                // Uporabi izvorni link iz PB, če obstaja, sicer pa privzeto pot
+                const destinationUrl = property.link || `/property/${property.id}`;
+                const isExternal = !!property.link;
 
-              return (
-                <div 
-                  key={property.id} 
-                  className={`rounded-3xl overflow-hidden border transition-all duration-300 group hover:-translate-y-1 hover:shadow-2xl bg-white dark:bg-slate-900/80 ${
-                    isHighWeightPremium ? 'border-amber-400/40 shadow-xl' : 'dark:border-slate-800/60 border-slate-200'
-                  }`}
-                >
-                  <div className="relative aspect-[16/10] overflow-hidden bg-slate-950">
-                    {property.image && (
-                      <Image 
-                        src={property.image} 
-                        alt={property.title} 
-                        fill 
-                        sizes="(max-width: 768px) 100vw, 33vw" 
-                        className="object-cover transition-transform duration-500 group-hover:scale-105" 
-                      />
-                    )}
-                    <button 
-                      onClick={(e) => toggleFavorite(property.id, e)} 
-                      className="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md w-10 h-10 rounded-2xl flex items-center justify-center text-base border border-white/10"
-                    >
-                      {isLiked ? '❤️' : '♡'}
-                    </button>
-                    <div className="absolute bottom-3 left-3">
-                      <span className={`text-[11px] font-bold tracking-wider uppercase border rounded-md px-2.5 py-1 backdrop-blur-md ${getBadgeClass(property.badgeType)}`}>
-                        {property.filterTag === 'novogradnje' ? 'Novogradnja' : property.badgeText}
-                      </span>
+                return (
+                  <div 
+                    key={property.id} 
+                    className={`rounded-2xl overflow-hidden border flex flex-col justify-between transition-all duration-300 group hover:-translate-y-1.5 hover:shadow-xl bg-white dark:bg-slate-900 h-[460px] ${
+                      isHighWeightPremium 
+                        ? 'border-amber-400/50 shadow-md shadow-amber-400/5' 
+                        : 'dark:border-slate-800 border-slate-200'
+                    }`}
+                  >
+                    {/* Zgornji del: Slika + Značke */}
+                    <div className="relative h-52 overflow-hidden bg-slate-950 shrink-0">
+                      {property.image ? (
+                        <Image 
+                          src={property.image} 
+                          alt={property.title} 
+                          fill 
+                          sizes="(max-width: 768px) 100vw, 33vw" 
+                          className="object-cover transition-transform duration-500 group-hover:scale-103" 
+                          unoptimized={true}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900 gap-2">
+                          <span className="text-2xl">🏢</span>
+                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-60">Ni slike</span>
+                        </div>
+                      )}
+                      
+                      {/* Megleni gumb za priljubljene */}
+                      <button 
+                        onClick={(e) => toggleFavorite(property.id, e)} 
+                        className="absolute top-3 right-3 bg-slate-900/70 backdrop-blur-md hover:bg-slate-900 w-9 h-9 rounded-xl flex items-center justify-center text-sm border border-white/10 transition-colors z-20"
+                      >
+                        <span className={`transition-transform duration-200 active:scale-125 ${isLiked ? 'scale-110' : 'opacity-80'}`}>
+                          {isLiked ? '❤️' : '🤍'}
+                        </span>
+                      </button>
+
+                      {/* Dinamična statusna značka */}
+                      <div className="absolute bottom-3 left-3 z-10">
+                        <span className={`text-[10px] font-extrabold tracking-wider uppercase border rounded-lg px-2.5 py-1 backdrop-blur-md shadow-sm ${getBadgeClass(property.badgeType)}`}>
+                          {property.filterTag === 'novogradnje' ? 'Novogradnja' : property.badgeText || 'Premium'}
+                        </span>
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                    </div>
+
+                    {/* Sredinski in spodnji del: Vsebina */}
+                    <div className="p-6 flex-1 flex flex-col justify-between min-w-0">
+                      <div className="space-y-2">
+                        {/* Lokacija */}
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 tracking-wide uppercase">
+                          <span>📍</span>
+                          <span className="truncate" title={property.location}>{property.location}</span>
+                        </div>
+
+                        {/* Naslovnica nepremičnine */}
+                        <h3 className="dark:text-white text-slate-900 text-lg font-bold leading-snug line-clamp-2 group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors">
+                          {property.title}
+                        </h3>
+                      </div>
+
+                      {/* Tehnični podatki v ličnih značkah */}
+                      <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800/80 my-3 text-center">
+                        <div className="bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg">
+                          <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Kvadratura</div>
+                          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">📐 {property.area} m²</div>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg col-span-1">
+                          <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Cena / m²</div>
+                          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">
+                            {property.priceUnit === 'per_m2' ? `${property.price} €` : `${Math.round(property.price / (property.area || 1))} €`}
+                          </div>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-800/40 py-1.5 rounded-lg">
+                          <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Postavitev</div>
+                          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5 truncate px-1">🚪 {property.rooms} sob</div>
+                        </div>
+                      </div>
+
+                      {/* Spodnji del: Cena + Akcija */}
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Skupna cena</span>
+                          <span className="text-2xl font-extrabold text-slate-900 dark:text-amber-400 tracking-tight">
+                            {property.price.toLocaleString('sl-SI')} €
+                          </span>
+                        </div>
+                        
+                        <a 
+                          href={destinationUrl} 
+                          target={isExternal ? "_blank" : "_self"}
+                          rel={isExternal ? "noopener noreferrer" : undefined}
+                          className="bg-slate-900 hover:bg-amber-400 text-white hover:text-slate-950 dark:bg-slate-800 dark:hover:bg-amber-400 dark:hover:text-slate-950 text-xs font-bold uppercase tracking-wider py-2.5 px-4 rounded-xl transition-all shadow-sm active:scale-95"
+                        >
+                          Ogled oglasu →
+                        </a>
+                      </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  <div className="p-7">
-                    <div className="dark:text-amber-400 text-amber-600 text-xs font-bold tracking-wider uppercase mb-2">📍 {property.location}</div>
-                    <h3 className="dark:text-white text-slate-900 text-xl font-semibold leading-snug line-clamp-2 min-h-[56px] mb-5 group-hover:text-amber-500 transition-colors">
-                      {property.title}
-                    </h3>
-                    
-                    <div className="flex items-center justify-between border-t pt-4 text-xs font-medium dark:border-white/10 dark:text-white/60 border-slate-200 text-slate-600">
-                      <span>📐 {property.area} m²</span>
-                      <span>{property.priceUnit === 'per_m2' ? `${property.price} €/m²` : `${Math.round(property.price / (property.area || 1))} €/m²`}</span>
-                      <span>🚪 {property.rooms} sob</span>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t mt-5 pt-5 dark:border-white/10 border-slate-200">
-                      <div className="text-2xl font-bold dark:text-white text-slate-900">{property.price.toLocaleString('sl-SI')} €</div>
-                      <Link href={`/property/${property.id}`} className="text-sm text-amber-400 font-semibold tracking-wider hover:underline">
-                        Podrobnosti →
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            {/* ── GUMB ZA PRIKAZ VSEH OGLASOV ── */}
+            <div className="flex justify-center mt-12">
+              <Link
+                href="/search"
+                className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider px-8 py-4 rounded-xl text-xs transition-all shadow-md hover:shadow-lg active:scale-98"
+              >
+                Prikaži vse oglase <span>→</span>
+              </Link>
+            </div>
+          </>
         )}
       </section>
 
