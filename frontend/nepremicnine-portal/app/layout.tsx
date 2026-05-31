@@ -81,10 +81,8 @@ export default function RootLayout({
                 
                 <div className="col-span-2 md:col-span-1 space-y-4">
                   <div className="flex items-center gap-2 text-sm font-bold text-white tracking-tight">
-                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-amber-500 text-stone-900 font-bold text-xs">
-                      V
-                    </div>
-                    <span>vesta.si</span>
+                    
+                    <span>vesta<span className="text-amber-500">.si</span></span>
                   </div>
                   <p className="text-slate-500 text-xs leading-relaxed max-w-sm">
                     Inteligentni agregator in analitični sistem za spremljanje nepremičninskega trga v Sloveniji. Podatki so zajeti, očiščeni in osveženi 24/7.

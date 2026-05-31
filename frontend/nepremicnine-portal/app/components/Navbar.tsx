@@ -82,6 +82,11 @@ export default function Navbar() {
 
         {/* Navigacijske povezave v zahtevanem vrstnem redu */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
+
+         {/* 4. Domov */}
+          <Link href="/" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
+            {t.home}
+          </Link>
           
           {/* 1. Nepremičnine */}
           <Link href="/search" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
@@ -115,10 +120,7 @@ export default function Navbar() {
             {t.newbuilds}
           </Link>
 
-          {/* 4. Domov */}
-          <Link href="/" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
-            {t.home}
-          </Link>
+          
 
           {/* 5. O projektu */}
           <Link href="/#about" className="hover:text-amber-400 transition-colors">

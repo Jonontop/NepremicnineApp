@@ -2,23 +2,29 @@ import Link from 'next/link';
 
 export default function TermsOfService() {
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-gray-700">
-        <Link href="/" className="text-sm text-blue-600 hover:underline font-medium">
+    // Zunanje ozadje: svetlo siva -> temno modra
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+      {/* Kartica: bela -> skrilavca siva, robovi prilagojeni */}
+      <div className="max-w-3xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-300 transition-colors duration-300">
+        
+        {/* Povezava: modra -> svetleje modra za kontrast */}
+        <Link href="/" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium">
           ← Nazaj na začetno stran
         </Link>
         
-        <h1 className="text-3xl font-extrabold text-gray-900 mt-4 mb-2">
+        {/* Glavni naslov: črn -> bel */}
+        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mt-4 mb-2">
           Splošni pogoji uporabe (TOS)
         </h1>
-        <p className="text-sm text-gray-500 mb-6">
+        {/* Datum: siva -> ugasnjena siva */}
+        <p className="text-sm text-gray-500 dark:text-slate-500 mb-6">
           Zadnja posodobitev: {new Date().toLocaleDateString('sl-SI')}
         </p>
 
         <section className="space-y-6">
           {/* 1. Splošne določbe in opis */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">1. Splošne določbe in opis storitve</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">1. Splošne določbe in opis storitve</h2>
             <p className="text-sm leading-relaxed mb-2">
               Spletno mesto <strong>Vesta.si</strong> (v nadaljevanju: "Portal") deluje izključno kot tehnološki ponudnik in informacijski agregator nepremičninskih oglasov v Sloveniji. Uporabnikom omogočamo iskanje, pregled in primerjavo javno dostopnih podatkov na enem mestu.
             </p>
@@ -29,8 +35,9 @@ export default function TermsOfService() {
 
           {/* 2. Omejitev odgovornosti */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">2. Omejitev odgovornosti (ZURE)</h2>
-            <div className="text-sm leading-relaxed text-amber-800 bg-amber-50 p-4 rounded-xl border border-amber-200 space-y-2">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">2. Omejitev odgovornosti (ZURE)</h2>
+            {/* Jantaren okvir (Opozorilo): Prilagoditev barv za temni način */}
+            <div className="text-sm leading-relaxed text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/50 p-4 rounded-xl border border-amber-200 dark:border-amber-900 space-y-2">
               <p>
                 ⚠️ <strong>Pomembno opozorilo:</strong> Vesta.si ni nepremičninska družba, ne opravlja storitev nepremičninskega posredovanja in ne nastopa kot posrednik pri prometu z nepremičninami.
               </p>
@@ -45,7 +52,7 @@ export default function TermsOfService() {
 
           {/* 3. Preusmerjanje uporabnikov */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">3. Preusmerjanje uporabnikov in zunanje povezave</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">3. Preusmerjanje uporabnikov in zunanje povezave</h2>
             <p className="text-sm leading-relaxed">
               Za zagotavljanje celovitih informacij in generiranje prometa izvornim oglaševalcem Portal uporabnike preko zunanjih povezav preusmerja neposredno na spletna mesta izvornih ponudnikov oglasov. Upravljavec nima vpliva na vsebino, dostopnost ali varnost zunanjih spletnih mest in zanjo ne odgovarja.
             </p>
@@ -53,7 +60,7 @@ export default function TermsOfService() {
 
           {/* 4. Avtorske pravice in viri */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">4. Avtorske pravice in intelektualna lastnina</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">4. Avtorske pravice in intelektualna lastnina</h2>
             <p className="text-sm leading-relaxed mb-2">
               Vse blagovne znamke, logotipi, opisi oglasov ter slikovno gradivo, ki so indeksirani iz zunanjih virov, ostajajo v izključni lasti njihovih zakonitih lastnikov (nepremičninskih agencij, portalov oziroma fizičnih oseb).
             </p>
@@ -64,12 +71,13 @@ export default function TermsOfService() {
 
           {/* 5. Notice and Take-Down */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">5. Protokol za odstranitev vsebine (Notice and Take-Down)</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">5. Protokol za odstranitev vsebine (Notice and Take-Down)</h2>
             <p className="text-sm leading-relaxed mb-2">
               Upravljavec Portala deluje v dobri veri in spoštuje pravice intelektualne lastnine ter poslovne interese vseh nepremičninskih družb. 
             </p>
-            <p className="text-sm leading-relaxed font-medium bg-gray-100 p-3 rounded-lg border border-gray-200">
-              Če ste lastnik avtorskih pravic ali zakoniti zastopnik nepremičninske družbe in ne želite, da se vaši javni oglasni viri indeksirajo na Portalu Vesta.si, nam pišite na elektronski naslov: <span className="text-blue-600 underline">info@vesta.si</span>. 
+            {/* Poudarjen sivi okvir */}
+            <p className="text-sm leading-relaxed font-medium bg-gray-100 dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+              Če ste lastnik avtorskih pravic ali zakoniti zastopnik nepremičninske družbe in ne želite, da se vaši javni oglasni viri indeksirajo na Portalu Vesta.si, nam pišite na elektronski naslov: <span className="text-blue-600 dark:text-blue-400 underline">info@vesta.si</span>. 
             </p>
             <p className="text-sm leading-relaxed mt-2">
               Upravljavec se zavezuje, da bo upravičene zahteve obravnaval prednostno in sporne oglase oziroma celotne vire odstranil iz sistema najkasneje v roku 48 ur od prejema obvestila.
@@ -78,7 +86,7 @@ export default function TermsOfService() {
 
           {/* 6. Varstvo podatkov in končne določbe */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">6. Varstvo podatkov in veljavno pravo</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">6. Varstvo podatkov in veljavno pravo</h2>
             <p className="text-sm leading-relaxed mb-2">
               Portal Vesta.si ne zbira in ne obdeluje osebnih podatkov obiskovalcev, razen anonimnih tehničnih podatkov za delovanje seje in analitiko obiska.
             </p>
