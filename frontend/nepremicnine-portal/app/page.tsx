@@ -6,7 +6,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import CountUp from 'react-countup';
 
-// ── TYPES & INTERFACES ──────────────────────────────────────────────────────
 interface Property {
   id: string;
   title: string;
@@ -24,7 +23,7 @@ interface Property {
   isPremium?: boolean;
   filterTag: 'novogradnje' | '24h' | 'premium' | 'rabljeno';
   type: 'stanovanje' | 'hisa' | 'poslovni' | 'vikend';
-  weight: number; // Dodano polje za prioriteto oglasov
+  weight: number;
 }
 
 interface TypeStats {
@@ -39,64 +38,39 @@ interface ActionStats {
 }
 
 export default function EstateMS() {
-  // ── STATES ────────────────────────────────────────────────────────────────
+  const router = useRouter();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const router = useRouter();
-  const scrolled = false;
-  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [animateStats, setAnimateStats] = useState<boolean>(false);
+  
+  const [typeCounts, setTypeCounts] = useState<TypeStats>({ poslovni: 0, zemljisca: 0, hise: 0, stanovanja: 0 });
+  const [actionCounts, setActionCounts] = useState<ActionStats>({});
   const [activeAdsCount, setActiveAdsCount] = useState<number>(0);
   const [newbuildCount, setNewbuildCount] = useState<number>(0);
   const [regionsCount, setRegionsCount] = useState<number>(0);
-  const [animateStats, setAnimateStats] = useState<boolean>(false);
-  const [language, setLanguage] = useState<'sl' | 'en'>('sl');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [typeCounts, setTypeCounts] = useState<TypeStats>({
-    poslovni: 0,
-    zemljisca: 0,
-    hise: 0,
-    stanovanja: 0,
-  });
-  const [actionCounts, setActionCounts] = useState<ActionStats>({});
 
-  // Iskalna stanja iz Hero iskalne kartice
+  // Iskalna stanja
   const [searchType, setSearchType] = useState<string>('stanovanje');
   const [searchLocation, setSearchLocation] = useState<string>('');
   const [searchMinPrice, setSearchMinPrice] = useState<string>('');
   const [searchMaxPrice, setSearchMaxPrice] = useState<string>('');
-  const [selectedRooms, setSelectedRooms] = useState<number | null>(3);
+  const [selectedRooms, setSelectedRooms] = useState<number | null>(null); // Ponastavljeno na null za takojšen izris
 
-  // Končni iskalni pogoji, ki se uveljavijo ob kliku na "Poišči"
-  // Start with no restrictive filters so top properties render immediately
-  const [appliedFilters, setAppliedFilters] = useState({
-    type: '',
-    location: '',
-    minPrice: '',
-    maxPrice: '',
-    rooms: null as number | null
-  });
-
-  // ── PRIDOBIVANJE PODATKOV IZ BAZE (NAČIN KOT V SEARCH/PAGE) ─────────────────
   useEffect(() => {
     const fetchTopProperties = async () => {
       try {
         setLoading(true);
-        // Klic vašega API endpointa z parametri za sortiranje po teži in limitom 6
-        // Opomba: Prilagodite url pot (/api/properties ali /api/search), če ima vaš backend drugačno strukturo
         const response = await fetch('/api/properties?limit=6&orderBy=weight_desc&view=home');
-        if (!response.ok) {
-          throw new Error('Napaka pri pridobivanju podatkov');
-        }
+        if (!response.ok) throw new Error('Napaka pri pridobivanju podatkov');
         const data = await response.json();
-        setProperties(data);
+        setProperties((data || []).filter((p: Property) => p && p.id && p.title));
       } catch (error) {
         console.error("Ni bilo mogoče naložiti oglasov iz baze:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchTopProperties();
   }, []);
 
@@ -104,9 +78,7 @@ export default function EstateMS() {
     const fetchStats = async () => {
       try {
         const response = await fetch('/api/properties?view=stats');
-        if (!response.ok) {
-          throw new Error('Napaka pri pridobivanju statistike');
-        }
+        if (!response.ok) throw new Error('Napaka pri pridobivanju statistike');
         const data = await response.json();
         setActiveAdsCount(Number(data.activeAdsCount) || 0);
         setNewbuildCount(Number(data.newbuildCount) || 0);
@@ -117,76 +89,25 @@ export default function EstateMS() {
         console.error("Ni bilo mogoče naložiti statistike:", error);
       }
     };
-
     fetchStats();
+    setAnimateStats(true);
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimateStats(true), 150);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const resolveTheme = (): 'light' | 'dark' => {
-      const storedTheme = window.sessionStorage.getItem('theme');
-      if (storedTheme === 'dark' || storedTheme === 'light') return storedTheme;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    };
-
-    const timer = window.setTimeout(() => {
-      setTheme(resolveTheme());
-    }, 0);
-
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const onMediaChange = () => {
-      const storedTheme = window.sessionStorage.getItem('theme');
-      if (!storedTheme) setTheme(media.matches ? 'dark' : 'light');
-    };
-    media.addEventListener('change', onMediaChange);
-
-    return () => {
-      window.clearTimeout(timer);
-      media.removeEventListener('change', onMediaChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    window.sessionStorage.setItem('theme', theme);
-  }, [theme]);
-
-  // Header scroll state is now handled by the shared Header component
-
-  // ── TOGGLE FAVORITES ──────────────────────────────────────────────────────
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
-    );
+    setFavorites((prev) => prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]);
   };
 
-  // ── HANDLE SEARCH SUBMIT ──────────────────────────────────────────────────
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (searchType) params.set('type', searchType);
     if (searchLocation) params.set('location', searchLocation);
     if (searchMinPrice) params.set('minPrice', searchMinPrice);
     if (searchMaxPrice) params.set('maxPrice', searchMaxPrice);
-    window.location.href = `/search?${params.toString()}`;
+    if (selectedRooms) params.set('rooms', selectedRooms.toString());
+    router.push(`/search?${params.toString()}`);
   };
 
-  // ── FILTER LOGIC (Glede na iskalnik v hero sekciji) ───────────────────────
-  const filteredProperties = properties.filter((prop) => {
-    if (appliedFilters.type && prop.type !== appliedFilters.type) return false;
-    if (appliedFilters.location && prop.city !== appliedFilters.location) return false;
-    if (appliedFilters.minPrice && prop.totalPrice < Number(appliedFilters.minPrice)) return false;
-    if (appliedFilters.maxPrice && prop.totalPrice > Number(appliedFilters.maxPrice)) return false;
-    if (appliedFilters.rooms !== null) {
-      if (appliedFilters.rooms === 5 ? prop.rooms < 5 : prop.rooms !== appliedFilters.rooms) return false;
-    }
-    return true;
-  });
-
-  // Pomožna funkcija za značke barv
   const getBadgeClass = (type: string) => {
     switch (type) {
       case 'emerald': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -196,84 +117,17 @@ export default function EstateMS() {
     }
   };
 
-  const dictionary = {
-    sl: {
-      listings: 'Vse nepremičnine',
-      market: 'Statistika trga',
-      search: 'Poišči nepremičnine',
-      favorites: 'Priljubljene',
-      intro: 'Sistem v realnem času spremlja',
-      active: 'aktivnih oglasov',
-      updated: 'posodobljeno pred 5 minutami',
-      titleTop: 'Poiščite ponudbo glede na vrsto nepremičnine',
-      details: 'Podrobnosti',
-    },
-    en: {
-      listings: 'All listings',
-      market: 'Market stats',
-      search: 'Search properties',
-      favorites: 'Favorites',
-      intro: 'Live system tracks',
-      active: 'active listings',
-      updated: 'updated 5 minutes ago',
-      titleTop: 'Browse listings by property type',
-      details: 'Details',
-    },
-  } as const;
-  const t = dictionary[language];
-  const isDark = theme === 'dark';
-
   return (
-    <div className={`${isDark ? 'bg-[#0f172a] text-slate-100' : 'bg-slate-100 text-slate-900'} min-h-screen selection:bg-amber-300 selection:text-slate-900`}>
+    <div className="min-h-screen transition-colors duration-200 dark:bg-[#0f172a] dark:text-slate-100 bg-slate-100 text-slate-900">
       
-      {/* Alert bar removed - language selector moved to header */}
-
-      
-
-      {/* ── NAVBAR ── */}
-      <header className={`sticky top-0 z-50 border-b transition-all duration-300 backdrop-blur-md ${isDark ? 'border-slate-800' : 'border-slate-200'} ${scrolled ? (isDark ? 'bg-[#0f172a]/95 shadow-md' : 'bg-white/95 shadow-md') : (isDark ? 'bg-[#0f172a]/80' : 'bg-white/80')}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <nav className="flex items-center justify-between h-20">
-            <a href="#" className="flex items-center gap-2.5 group shrink-0">
-              <div>
-                <span className={`${isDark ? 'text-white' : 'text-slate-900'} font-bold text-base tracking-tight block`}>vesta.si</span>
-                <span className="text-amber-600 text-[10px] font-semibold uppercase tracking-widest block -mt-0.5">Slovenija</span>
-              </div>
-            </a>
-            <div className="hidden md:flex items-center gap-8">
-              <a href="#listings" className={`${isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'} text-sm font-semibold uppercase tracking-wider transition-colors`}>{t.listings}</a>
-              <a href="#type-offers" className={`${isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'} text-sm font-semibold uppercase tracking-wider transition-colors`}>{t.market}</a>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className={`hidden sm:flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border ${isDark ? 'text-slate-100 bg-slate-800 border-slate-700' : 'text-slate-700 bg-slate-100 border-slate-200'}`}>
-                <span>❤️ {t.favorites}: <strong className="text-amber-600">{favorites.length}</strong></span>
-              </div>
-              <button
-                onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-                title={isDark ? 'Preklopi na svetlo temo' : 'Preklopi na temno temo'}
-                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors border text-lg ${isDark ? 'text-amber-300 hover:bg-slate-800 border-slate-700' : 'text-slate-600 hover:bg-slate-100 border-slate-200'}`}
-              >
-                {isDark ? '☀️' : '🌙'}
-              </button>
-              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className={`md:hidden w-10 h-10 flex items-center justify-center rounded-xl transition-colors border ${isDark ? 'text-slate-300 hover:bg-slate-800 border-slate-700' : 'text-slate-700 hover:bg-slate-100 border-slate-200'}`}>
-                ☰
-              </button>
-            </div>
-          </nav>
-        </div>
-      </header>
-
       {/* ── HERO SECTION ── */}
-  <section className={`relative overflow-hidden py-20 lg:py-28 px-4 sm:px-6 border-b ${isDark ? 'border-slate-800 bg-linear-to-b from-[#0f172a] to-[#111827]' : 'border-slate-200 bg-linear-to-b from-white to-slate-100'}`}>
-        {/* Decorative background image (hero) */}
-  <div className="absolute inset-0 z-0 overflow-hidden">
-          <Image src="/hero.png" alt="" aria-hidden={true} priority fill className="object-cover opacity-100 scale-110" />
-          <div className={`${isDark ? 'absolute inset-0 bg-black/40' : 'absolute inset-0 bg-black/20'}`} aria-hidden={true} />
+      <section className="relative overflow-hidden py-20 lg:py-28 px-4 sm:px-6 border-b dark:border-slate-800 border-slate-200 bg-gradient-to-b dark:from-[#0f172a] dark:to-[#111827] from-white to-slate-100">
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <Image src="/hero.png" alt="" aria-hidden={true} priority fill className="object-cover opacity-30 scale-105" />
+          <div className="absolute inset-0 bg-black/20 dark:bg-black/40" />
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10 grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          
-          {/* Hero Left */}
           <div className="lg:col-span-5">
             <div className="flex items-center gap-3 mb-5">
               <span className="w-8 h-px bg-amber-400" />
@@ -285,38 +139,36 @@ export default function EstateMS() {
               z značajem.
             </h1>
             <p className="text-white/80 text-base leading-relaxed max-w-md mb-8">
-              Najcelovitejša zbirka nepremičnin v Sloveniji. Resnični podatki trga, verifikacija oglaševalcev in inteligentno iskanje na enem mestu.
+              Najcelovitejša zbirka nepremičnin v Sloveniji. Resnični podatki trga, agregirani iz preverjenih agencij brez podvajanja.
             </p>
             
-            {/* Micro Stats */}
-            <div className={`flex gap-6 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'} pt-6 max-w-sm`}>
+            <div className="flex gap-6 border-t dark:border-slate-700 border-slate-200 pt-6 max-w-sm">
               <div>
-                  <div className={`text-white text-2xl font-bold`}>
+                <div className="text-white text-2xl font-bold">
                   {animateStats ? <CountUp end={activeAdsCount} duration={1.3} separator="." /> : 0}
                 </div>
-                  <div className="text-white/70 text-[11px] uppercase font-bold tracking-wider mt-0.5">Aktivnih oglasov</div>
+                <div className="text-white/70 text-[11px] uppercase font-bold tracking-wider mt-0.5">Aktivnih oglasov</div>
               </div>
-              <div className={`w-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              <div className="w-px dark:bg-slate-700 bg-slate-200" />
               <div>
-                  <div className={`text-white text-2xl font-bold`}>
+                <div className="text-white text-2xl font-bold">
                   {animateStats ? <CountUp end={newbuildCount} duration={1.3} separator="." /> : 0}
                 </div>
-                  <div className="text-white/70 text-[11px] uppercase font-bold tracking-wider mt-0.5">Novogradnje</div>
+                <div className="text-white/70 text-[11px] uppercase font-bold tracking-wider mt-0.5">Novogradnje</div>
               </div>
-              <div className={`w-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              <div className="w-px dark:bg-slate-700 bg-slate-200" />
               <div>
-                  <div className={`text-white text-2xl font-bold`}>
-                  {animateStats ? <CountUp end={regionsCount} duration={1.3} separator="." /> : 0} mest
+                <div className="text-white text-2xl font-bold">
+                  {animateStats ? <CountUp end={regionsCount} duration={1.3} separator="." /> : 0}
                 </div>
-                  <div className="text-white/70 text-[11px] uppercase font-bold tracking-wider mt-0.5">Regij</div>
+                <div className="text-white/70 text-[11px] uppercase font-bold tracking-wider mt-0.5">Lokacij</div>
               </div>
             </div>
           </div>
 
-          {/* Hero Right: Iskalna kartica */}
-          <div className={`lg:col-span-7 p-7 sm:p-9 rounded-2xl shadow-xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            
-            <div className="flex gap-2 border-b border-slate-200 pb-4 mb-6 overflow-x-auto">
+          {/* Iskalna kartica */}
+          <div className="lg:col-span-7 p-7 sm:p-9 rounded-2xl shadow-xl dark:bg-slate-900 dark:border dark:border-slate-700 bg-white border border-slate-200">
+            <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 pb-4 mb-6 overflow-x-auto">
               {[
                 { id: 'stanovanje', label: 'Stanovanje' },
                 { id: 'hisa', label: 'Hiša' },
@@ -326,7 +178,7 @@ export default function EstateMS() {
                 <button
                   key={t.id}
                   onClick={() => setSearchType(t.id)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold uppercase tracking-wider transition-all border whitespace-nowrap ${searchType === t.id ? 'border-amber-300 bg-amber-50 text-amber-700 shadow-inner' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold uppercase tracking-wider transition-all border whitespace-nowrap ${searchType === t.id ? 'border-amber-400 bg-amber-400/10 text-amber-500 shadow-inner' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                 >
                   {t.label}
                 </button>
@@ -334,13 +186,12 @@ export default function EstateMS() {
             </div>
             
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
-              {/* Lokacija */}
               <div>
                 <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">Lokacija nepremičnine</label>
                 <select 
                   value={searchLocation} 
                   onChange={(e) => setSearchLocation(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:border-amber-400 appearance-none cursor-pointer"
+                  className="w-full border rounded-xl px-3 py-3 text-sm font-medium focus:outline-none focus:border-amber-400 appearance-none cursor-pointer dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 bg-slate-50 border-slate-300 text-slate-800"
                 >
                   <option value="">Vsa Slovenija</option>
                   <option value="Ljubljana">Ljubljana</option>
@@ -351,16 +202,15 @@ export default function EstateMS() {
                 </select>
               </div>
 
-              {/* Število sob */}
               <div>
                 <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">Število sob</label>
-                <div className="flex gap-1.5 justify-between bg-slate-50 border border-slate-300 p-1 rounded-xl">
+                <div className="flex gap-1.5 justify-between border p-1 rounded-xl dark:bg-slate-800 dark:border-slate-700 bg-slate-50 border-slate-300">
                   {[1, 2, 3, 4, 5].map((num) => (
                     <button
                       key={num}
                       type="button"
-                      onClick={() => setSelectedRooms(num)}
-                      className={`flex-1 text-center py-2.5 text-sm font-bold rounded-lg transition-all ${selectedRooms === num ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                      onClick={() => setSelectedRooms(selectedRooms === num ? null : num)}
+                      className={`flex-1 text-center py-2.5 text-sm font-bold rounded-lg transition-all ${selectedRooms === num ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                     >
                       {num === 5 ? '5+' : num}
                     </button>
@@ -369,40 +219,36 @@ export default function EstateMS() {
               </div>
             </div>
 
-            {/* Cenovni Razred */}
             <div className="mb-6">
               <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">Cenovni okvir (€)</label>
               <div className="grid grid-cols-2 gap-3">
                 <input 
                   type="number" 
-                  placeholder="Minimalna cena (€)" 
+                  placeholder="Minimalna cena" 
                   value={searchMinPrice}
                   onChange={(e) => setSearchMinPrice(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-400"
+                  className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 bg-slate-50 border-slate-300"
                 />
                 <input 
                   type="number" 
-                  placeholder="Maksimalna cena (€)" 
+                  placeholder="Maksimalna cena" 
                   value={searchMaxPrice}
                   onChange={(e) => setSearchMaxPrice(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-400"
+                  className="w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 bg-slate-50 border-slate-300"
                 />
               </div>
             </div>
 
-            <button 
-              onClick={handleSearch}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider py-4 rounded-xl text-sm transition-all shadow-lg shadow-amber-400/10 active:scale-[0.99]"
-            >
-              {t.search}
+            <button onClick={handleSearch} className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider py-4 rounded-xl text-sm transition-all shadow-lg active:scale-[0.99]">
+              Poišči nepremičnine
             </button>
           </div>
-
         </div>
       </section>
 
-      <section id="type-offers" className={`max-w-7xl mx-auto px-4 sm:px-6 py-16 rounded-2xl ${isDark ? 'bg-slate-900/40' : 'bg-slate-200/50'}`}>
-        <h2 className={`text-4xl font-bold mb-10 ${isDark ? 'text-white' : 'text-slate-900'}`}>{t.titleTop}</h2>
+      {/* ── KATEGORIJE TRGA ── */}
+      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24">
+        <h2 className="text-4xl font-bold mb-10 dark:text-white text-slate-900">Poiščite ponudbo glede na vrsto nepremičnine</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { key: 'poslovni', label: 'Poslovni prostori', img: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80' },
@@ -410,141 +256,96 @@ export default function EstateMS() {
             { key: 'hise', label: 'Hiše', img: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80' },
             { key: 'stanovanja', label: 'Stanovanja', img: 'https://images.unsplash.com/photo-1493666438817-866a91353ca9?auto=format&fit=crop&w=800&q=80' },
           ].map((item) => {
-            // map keys to search type params
-            const typeMap: Record<string, string> = {
-              poslovni: 'poslovni',
-              zemljisca: 'zemljisce',
-              hise: 'hisa',
-              stanovanja: 'stanovanje',
-            };
+            const typeMap: Record<string, string> = { poslovni: 'poslovni', zemljisca: 'zemljisce', hise: 'hisa', stanovanja: 'stanovanje' };
             const typeParam = typeMap[item.key] ?? '';
             return (
-            <div
-              key={item.key}
-              role="button"
-              tabIndex={0}
-              aria-label={`Iskanje: ${item.label}`}
-              onClick={() => router.push(`/search?type=${typeParam}`)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  router.push(`/search?type=${typeParam}`);
-                }
-              }}
-              className={`cursor-pointer ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-2xl border p-4 shadow-sm transition-transform duration-300 hover:scale-[1.04] hover:shadow-xl focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300`}
-            >
-              <div className={`${isDark ? 'text-slate-100' : 'text-slate-800'} text-xl font-semibold mb-3`}>{item.label}</div>
-              <div className="relative h-44 rounded-xl overflow-hidden mb-3">
-                <Image src={item.img} alt={item.label} fill sizes="(max-width: 768px) 100vw, 25vw" className="object-cover" />
-                <div className="absolute inset-0 bg-linear-to-t from-black/45 to-transparent" />
-                <div className="absolute bottom-3 left-3 text-white text-5xl font-bold">
-                  {animateStats ? <CountUp end={typeCounts[item.key as keyof TypeStats]} duration={1.3} separator="." /> : 0}
+              <div key={item.key} onClick={() => router.push(`/search?type=${typeParam}`)} className="cursor-pointer dark:bg-slate-900/60 dark:border-slate-800 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm transition-all duration-300 hover:scale-[1.03] hover:shadow-xl">
+                <div className="dark:text-slate-100 text-slate-800 text-xl font-semibold mb-3">{item.label}</div>
+                <div className="relative h-44 rounded-xl overflow-hidden mb-3">
+                  <Image src={item.img} alt={item.label} fill sizes="(max-width: 768px) 100vw, 25vw" className="object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-3 left-3 text-white text-5xl font-bold">
+                    {animateStats ? <CountUp end={typeCounts[item.key as keyof TypeStats] || 0} duration={1.3} separator="." /> : 0}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link href={`/search?type=${typeParam}&action=prodaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-rose-500/10 hover:bg-rose-500/20 rounded-lg py-2 text-xs font-semibold text-rose-500 transition-colors">Prodaja {actionCounts[item.key]?.prodaja ?? 0}</Link>
+                  <Link href={`/search?type=${typeParam}&action=oddaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg py-2 text-xs font-semibold text-emerald-500 transition-colors">Oddaja {actionCounts[item.key]?.oddaja ?? 0}</Link>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Link href={`/search?type=${typeParam}&action=prodaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-slate-100 border border-slate-200 rounded-lg py-2.5 text-sm font-semibold text-rose-500">Prodaja {actionCounts[item.key]?.prodaja ?? 0}</Link>
-                <Link href={`/search?type=${typeParam}&action=oddaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-slate-100 border border-slate-200 rounded-lg py-2.5 text-sm font-semibold text-rose-500">Oddaja {actionCounts[item.key]?.oddaja ?? 0}</Link>
-              </div>
-            </div>
-          )})}
+            );
+          })}
         </div>
       </section>
 
       {/* ── PROPERTY GRID ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16" id="listings">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24" id="listings">
+        <div className="flex items-center justify-between mb-10">
+          <h2 className="text-4xl font-bold dark:text-white text-slate-900">Najnovejša Premium Ponudba</h2>
+        </div>
+
         {loading ? (
-          /* Stanje med nalaganjem podatkov iz baze */
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest animate-pulse">
-              Pridobivanje top ponudbe iz baze podatkov...
-            </p>
+            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest animate-pulse">Pridobivanje oglasov...</p>
           </div>
-        ) : filteredProperties.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-slate-300 rounded-2xl bg-white">
-            <p className="text-slate-500 text-base font-medium mb-2">Ni zadetkov za izbrane iskalne pogoje.</p>
-            <button 
-              onClick={() => {
-                setAppliedFilters({ type: 'stanovanje', location: '', minPrice: '', maxPrice: '', rooms: null });
-                setSearchLocation(''); setSearchMinPrice(''); setSearchMaxPrice(''); setSelectedRooms(null);
-              }}
-              className="text-sm text-amber-600 underline"
-            >
-              Ponastavi iskalnik
-            </button>
+        ) : properties.length === 0 ? (
+          <div className="text-center py-20 border border-dashed border-slate-300 rounded-2xl bg-white/5">
+            <p className="text-slate-400 text-base font-medium">V bazi trenutno ni top oglasov.</p>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredProperties.map((property) => {
+            {properties.map((property) => {
               const isLiked = favorites.includes(property.id);
               const isHighWeightPremium = property.weight >= 80 || property.isPremium;
 
               return (
-                <div
-                  key={property.id}
-                  className={`${isDark ? 'bg-[#0b1838]' : 'bg-white'} rounded-3xl overflow-hidden border transition-all duration-300 group hover:-translate-y-1 hover:shadow-2xl ${isHighWeightPremium ? 'border-amber-300/40 shadow-[0_8px_35px_rgba(245,158,11,0.08)]' : (isDark ? 'border-slate-800/40' : 'border-slate-200')}`}
+                <div 
+                  key={property.id} 
+                  className={`rounded-3xl overflow-hidden border transition-all duration-300 group hover:-translate-y-1 hover:shadow-2xl bg-white dark:bg-slate-900/80 ${
+                    isHighWeightPremium ? 'border-amber-400/40 shadow-xl' : 'dark:border-slate-800/60 border-slate-200'
+                  }`}
                 >
-                  {/* Slika */}
-                  <div className="relative aspect-16/10 overflow-hidden bg-slate-950">
-                    {property.image ? (
-                      <Image
-                        src={property.image}
-                        alt={property.title}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  <div className="relative aspect-[16/10] overflow-hidden bg-slate-950">
+                    {property.image && (
+                      <Image 
+                        src={property.image} 
+                        alt={property.title} 
+                        fill 
+                        sizes="(max-width: 768px) 100vw, 33vw" 
+                        className="object-cover transition-transform duration-500 group-hover:scale-105" 
                       />
-                    ) : (
-                      <div className="w-full h-full bg-slate-950 flex items-center justify-center text-white/20">Ni slike</div>
                     )}
-                    {/* Priljubljeno gumb */}
-                    <button
-                      onClick={(e) => toggleFavorite(property.id, e)}
-                      className="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md w-10 h-10 rounded-2xl flex items-center justify-center text-base shadow border border-white/10 transition-transform hover:scale-110"
+                    <button 
+                      onClick={(e) => toggleFavorite(property.id, e)} 
+                      className="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md w-10 h-10 rounded-2xl flex items-center justify-center text-base border border-white/10"
                     >
                       {isLiked ? '❤️' : '♡'}
                     </button>
-                    {/* Značka */}
                     <div className="absolute bottom-3 left-3">
-                      <span className={`text-[11px] font-bold tracking-wider uppercase border rounded-md px-2.5 py-1 shadow-md backdrop-blur-md ${getBadgeClass(property.badgeType)}`}>
+                      <span className={`text-[11px] font-bold tracking-wider uppercase border rounded-md px-2.5 py-1 backdrop-blur-md ${getBadgeClass(property.badgeType)}`}>
                         {property.filterTag === 'novogradnje' ? 'Novogradnja' : property.badgeText}
                       </span>
                     </div>
                   </div>
 
-                  {/* Vsebina */}
                   <div className="p-7">
-                    <div className={`${isDark ? 'text-amber-300' : 'text-amber-600'} text-xs font-bold tracking-wider uppercase mb-2`}>
-                      📍 {property.location}
-                    </div>
-                    <h3 className={`${isDark ? 'text-white' : 'text-slate-900'} text-3xl font-medium leading-snug line-clamp-2 min-h-20 mb-5 group-hover:text-amber-600 transition-colors`}>
+                    <div className="dark:text-amber-400 text-amber-600 text-xs font-bold tracking-wider uppercase mb-2">📍 {property.location}</div>
+                    <h3 className="dark:text-white text-slate-900 text-xl font-semibold leading-snug line-clamp-2 min-h-[56px] mb-5 group-hover:text-amber-500 transition-colors">
                       {property.title}
                     </h3>
                     
-                    {/* Tehnične podrobnosti */}
-                    <div className={`flex items-center justify-between border-t pt-4 text-sm font-medium ${isDark ? 'border-white/10 text-white/60' : 'border-slate-200 text-slate-600'}`}>
-                      <span className="flex items-center gap-1">📐 {property.area} m²</span>
-                      <span className="flex items-center gap-1">
-                        {property.priceUnit === 'per_m2'
-                          ? `Cena: ${property.price.toLocaleString('sl-SI')} ${'\u20ac/m\u00b2'}`
-                          : property.area > 0
-                            ? `Cena: ${Math.round(property.price / property.area).toLocaleString('sl-SI')} ${'\u20ac/m\u00b2'}`
-                            : 'Cena: /'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        🚪 {property.rooms} {property.rooms === 1 ? 'soba' : property.rooms === 2 ? 'sobi' : property.rooms === 3 || property.rooms === 4 ? 'sobe' : 'sob'}
-                      </span>
-                      <span className="flex items-center gap-1">📅 {property.year}</span>
+                    <div className="flex items-center justify-between border-t pt-4 text-xs font-medium dark:border-white/10 dark:text-white/60 border-slate-200 text-slate-600">
+                      <span>📐 {property.area} m²</span>
+                      <span>{property.priceUnit === 'per_m2' ? `${property.price} €/m²` : `${Math.round(property.price / (property.area || 1))} €/m²`}</span>
+                      <span>🚪 {property.rooms} sob</span>
                     </div>
 
-                    {/* Cena */}
-                    <div className={`flex items-center justify-between border-t mt-5 pt-5 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                      <div className={`text-4xl font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {property.price.toLocaleString('sl-SI')}{property.priceUnit === 'per_m2' ? ' \u20ac/m\u00b2' : ' \u20ac'}
-                      </div>
-                      <span className="text-lg text-amber-300 font-semibold tracking-wider hover:underline cursor-pointer">
-                        {t.details} →
-                      </span>
+                    <div className="flex items-center justify-between border-t mt-5 pt-5 dark:border-white/10 border-slate-200">
+                      <div className="text-2xl font-bold dark:text-white text-slate-900">{property.price.toLocaleString('sl-SI')} €</div>
+                      <Link href={`/property/${property.id}`} className="text-sm text-amber-400 font-semibold tracking-wider hover:underline">
+                        Podrobnosti →
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -553,6 +354,10 @@ export default function EstateMS() {
           </div>
         )}
       </section>
+
+      {/* Sidra za About in FAQ sekciji bosta kasneje zapolnjeni z vsebino */}
+      <section id="about" className="max-w-7xl mx-auto px-4 sm:px-6 py-4" />
+      <section id="faq" className="max-w-7xl mx-auto px-4 sm:px-6 py-4" />
 
     </div>
   );

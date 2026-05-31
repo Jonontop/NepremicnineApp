@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
+/* 1. POPRAVEK: Tailwindu v4 eksplicitno povemo, naj za 'dark:' uporablja .dark razred na html elementu */
+@variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+/* 2. POPRAVEK: Namesto @media uporabi .dark razred, da se osnovne barve spremenijo ob kliku na gumb */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -10,13 +19,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
