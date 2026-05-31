@@ -1,3 +1,4 @@
+import Script from 'next/script';
 import './globals.css';
 import Link from 'next/link';
 import type { Metadata } from 'next';
@@ -45,19 +46,17 @@ export default function RootLayout({
   return (
     <html lang="sl" className="scroll-smooth" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (_) {}
-            `,
-          }}
-        />
+        <Script id="theme-initializer" strategy="beforeInteractive">
+        {`
+          try {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+              document.documentElement.classList.add('dark');
+            } else {
+              document.documentElement.classList.remove('dark');
+            }
+          } catch (_) {}
+        `}
+      </Script>
       </head>
       <body 
         suppressHydrationWarning 
