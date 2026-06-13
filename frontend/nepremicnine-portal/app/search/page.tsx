@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Suspense } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useLanguage } from '../LanguageContext';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -95,8 +96,8 @@ function getComparablePrice(listing: Listing): number | null {
   return Number(listing.price);
 }
 
-function formatListingPrice(listing: Listing): string {
-  if (!listing.price || listing.price <= 0) return 'Po dogovoru';
+function formatListingPrice(listing: Listing, byAgreement = 'Po dogovoru'): string {
+  if (!listing.price || listing.price <= 0) return byAgreement;
   const suffix = getPriceUnit(listing) === 'per_m2' ? ' €/m²' : ' €';
   return `${Number(listing.price).toLocaleString('sl-SI')}${suffix}`;
 }
@@ -109,17 +110,133 @@ function formatPricePerM2(listing: Listing): string {
   return `${Math.round(Number(listing.price) / Number(listing.area)).toLocaleString('sl-SI')} €/m²`;
 }
 
+// ── TRANSLATIONS ─────────────────────────────────────────────────────────────
+const searchTranslations = {
+  sl: {
+    noLimit: 'Brez omejitve',
+    price: 'Cena',
+    listGrid: 'Prikaži kot Mrežo',
+    listList: 'Prikaži kot Seznam',
+    actionLabel: 'Tip posla',
+    all: 'Vse',
+    forSale: 'Prodaja',
+    forRent: 'Oddaja',
+    typeLabel: 'Vrsta',
+    allTypes: 'Vse vrste',
+    apartment: 'Stanovanje',
+    house: 'Hiša',
+    commercial: 'Poslovni prostor',
+    land: 'Zemljišče',
+    weekend: 'Vikend',
+    locationLabel: 'Kraj',
+    allLocations: 'Vse lokacije',
+    sortLabel: 'Razvrstitev',
+    recommended: 'Priporočeno',
+    newest: 'Najnovejši',
+    priceAsc: 'Cena: naraščajoče',
+    priceDesc: 'Cena: padajoče',
+    areaDesc: 'Površina: največje',
+    found: 'Najdeno',
+    listings: 'oglasov',
+    page: 'stran',
+    noResults: 'Ni zadetkov za izbrane filtre.',
+    resetFilters: 'Ponastavi filtre',
+    noImage: 'Ni slike',
+    viewListing: 'Oglej oglas',
+    loading: 'Nalagam nepremičnine...',
+    // Modal
+    approxLocation: 'Lokacija nepremičnine (Okvirna)',
+    area: 'Površina',
+    sourceSite: 'Izvorna stran',
+    advertisedPrice: 'Oglaševana tržna cena',
+    pricePerM2: 'Izračun na m²',
+    etnTitle: 'ETN Detaljna Analiza Con',
+    officialData: 'Uradni podatki cone',
+    etnAvg: 'Zgodovinsko povprečje ETN:',
+    marketDev: 'Tržno odstopanje:',
+    overpriced: 'Precenjeno',
+    etnRef: 'Referenčna vrednost (ETN):',
+    gursTax: 'Ocenjen GURS davčni temelj:',
+    noEtnData: 'Ni zadostnih podatkov o kvadraturi ali ceni za preračun ETN mikrolokacije.',
+    openListing: 'Odpri izvorni oglas na',
+    region: 'Regija',
+    unknownAddress: 'Neznan naslov',
+    unknownLocation: 'Neznana lokacija',
+    property: 'Nepremičnina',
+    sale: 'Prodaja',
+    waypoint: 'Waypoint',
+    byAgreement: 'Po dogovoru',
+  },
+  en: {
+    noLimit: 'No limit',
+    price: 'Price',
+    listGrid: 'Show as Grid',
+    listList: 'Show as List',
+    actionLabel: 'Deal type',
+    all: 'All',
+    forSale: 'For Sale',
+    forRent: 'For Rent',
+    typeLabel: 'Type',
+    allTypes: 'All types',
+    apartment: 'Apartment',
+    house: 'House',
+    commercial: 'Commercial',
+    land: 'Land',
+    weekend: 'Weekend House',
+    locationLabel: 'City',
+    allLocations: 'All locations',
+    sortLabel: 'Sort by',
+    recommended: 'Recommended',
+    newest: 'Newest',
+    priceAsc: 'Price: ascending',
+    priceDesc: 'Price: descending',
+    areaDesc: 'Area: largest',
+    found: 'Found',
+    listings: 'listings',
+    page: 'page',
+    noResults: 'No results for selected filters.',
+    resetFilters: 'Reset filters',
+    noImage: 'No image',
+    viewListing: 'View listing',
+    loading: 'Loading properties...',
+    // Modal
+    approxLocation: 'Property Location (Approximate)',
+    area: 'Area',
+    sourceSite: 'Source site',
+    advertisedPrice: 'Advertised market price',
+    pricePerM2: 'Price per m²',
+    etnTitle: 'ETN Detailed Zone Analysis',
+    officialData: 'Official zone data',
+    etnAvg: 'Historical ETN average:',
+    marketDev: 'Market deviation:',
+    overpriced: 'Overpriced',
+    etnRef: 'Reference value (ETN):',
+    gursTax: 'Estimated GURS tax base:',
+    noEtnData: 'Insufficient area or price data to compute ETN micro-location.',
+    openListing: 'Open original listing on',
+    region: 'Region',
+    unknownAddress: 'Unknown address',
+    unknownLocation: 'Unknown location',
+    property: 'Property',
+    sale: 'For Sale',
+    waypoint: 'Waypoint',
+    byAgreement: 'By agreement',
+  },
+};
+
 // ── PRICE SLIDER (Posodobljen z dinamičnim MAX) ────────────────────────────────
 function PriceRangeSlider({
-  minValue, maxValue, maxLimit, onChange
+  minValue, maxValue, maxLimit, onChange, lang
 }: {
   minValue: number | null;
   maxValue: number | null;
   maxLimit: number;
   onChange: (min: number | null, max: number | null) => void;
+  lang: 'sl' | 'en';
 }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const st = searchTranslations[lang];
 
   // Dinamični korak glede na velikost najvišje cene
   const STEP = maxLimit > 500000 ? 10000 : 1000;
@@ -127,7 +244,7 @@ function PriceRangeSlider({
   const max = maxValue ?? maxLimit;
   
   const minDisplay = minValue === null ? '0 €' : `${minValue.toLocaleString('sl-SI')} €`;
-  const maxDisplay = maxValue === null || maxValue >= maxLimit ? 'Brez omejitve' : `${maxValue.toLocaleString('sl-SI')} €`;
+  const maxDisplay = maxValue === null || maxValue >= maxLimit ? st.noLimit : `${maxValue.toLocaleString('sl-SI')} €`;
   
   const left = (min / maxLimit) * 100;
   const right = 100 - (max / maxLimit) * 100;
@@ -145,7 +262,7 @@ function PriceRangeSlider({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cena</label>
+        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{st.price}</label>
         <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
           {minDisplay} - {maxDisplay}
         </span>
@@ -178,7 +295,7 @@ function PriceRangeSlider({
       <div className="flex justify-between text-[10px] text-slate-400">
         <span>0 €</span>
         <span>{Math.round(maxLimit / 2).toLocaleString('sl-SI')} €</span>
-        <span>Brez omejitve</span>
+        <span>{st.noLimit}</span>
       </div>
     </div>
   );
@@ -190,6 +307,8 @@ const PAGE_SIZE = 30;
 function SearchContent() {
   const searchParams = useSearchParams();
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const st = searchTranslations[language];
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -307,7 +426,7 @@ function SearchContent() {
       <div className="flex justify-center items-center h-screen bg-slate-100 dark:bg-[#0f172a]">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-2xl font-medium text-slate-500 dark:text-slate-300">Nalagam nepremičnine...</p>
+          <p className="text-2xl font-medium text-slate-500 dark:text-slate-300">{st.loading}</p>
         </div>
       </div>
     );
@@ -323,7 +442,7 @@ function SearchContent() {
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm border font-medium transition-colors bg-white border-slate-200 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
         >
           <FontAwesomeIcon icon={faBuilding} className="text-amber-500" />
-          {layoutMode === 'grid' ? 'Prikaži kot Seznam' : 'Prikaži kot Mrežo'}
+          {layoutMode === 'grid' ? st.listList : st.listGrid}
         </button>
       </div>
 
@@ -334,10 +453,10 @@ function SearchContent() {
             
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <FontAwesomeIcon icon={faTag} className="text-[10px]" /> Tip posla
+                <FontAwesomeIcon icon={faTag} className="text-[10px]" /> {st.actionLabel}
               </label>
               <div className="grid grid-cols-3 gap-1 rounded-xl border p-1 bg-slate-50 border-slate-300 dark:bg-slate-800 dark:border-slate-700">
-                {[['vse', 'Vse'], ['prodaja', 'Prodaja'], ['oddaja', 'Oddaja']].map(([value, label]) => (
+                {([['vse', st.all], ['prodaja', st.forSale], ['oddaja', st.forRent]] as [string, string][]).map(([value, label]) => (
                   <button 
                     key={value} 
                     onClick={() => handleFilterChange('action', value)} 
@@ -355,25 +474,25 @@ function SearchContent() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <FontAwesomeIcon icon={faBuilding} className="text-[10px]" /> Vrsta
+                <FontAwesomeIcon icon={faBuilding} className="text-[10px]" /> {st.typeLabel}
               </label>
               <select 
                 value={filters.type} 
                 onChange={(e) => handleFilterChange('type', e.target.value)} 
                 className="w-full border text-sm font-medium rounded-xl p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer bg-slate-50 border-slate-300 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
               >
-                <option value="vse">Vse vrste</option>
-                <option value="stanovanje">Stanovanje</option>
-                <option value="hisa">Hiša</option>
-                <option value="poslovni">Poslovni prostor</option>
-                <option value="zemljisce">Zemljišče</option>
-                <option value="vikend">Vikend</option>
+                <option value="vse">{st.allTypes}</option>
+                <option value="stanovanje">{st.apartment}</option>
+                <option value="hisa">{st.house}</option>
+                <option value="poslovni">{st.commercial}</option>
+                <option value="zemljisce">{st.land}</option>
+                <option value="vikend">{st.weekend}</option>
               </select>
             </div>
 
             <div className="flex flex-col gap-1.5 lg:col-span-2">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-[10px]" /> Kraj
+                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-[10px]" /> {st.locationLabel}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -384,7 +503,7 @@ function SearchContent() {
                   onChange={(e) => { handleFilterChange('location', e.target.value); }} 
                   className="w-full border text-sm font-medium rounded-xl pl-9 p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer bg-slate-50 border-slate-300 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                 >
-                  <option value="">Vse lokacije</option>
+                  <option value="">{st.allLocations}</option>
                   {groupedLocations.map(({ region, values }) => (
                     <optgroup key={region} label={region}>
                       {values.map((kraj) => (<option key={kraj} value={kraj}>{kraj}</option>))}
@@ -396,18 +515,18 @@ function SearchContent() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <FontAwesomeIcon icon={faSortAmountDown} className="text-[10px]" /> Razvrstitev
+                <FontAwesomeIcon icon={faSortAmountDown} className="text-[10px]" /> {st.sortLabel}
               </label>
               <select 
                 value={filters.sortBy} 
                 onChange={(e) => handleFilterChange('sortBy', e.target.value)} 
                 className="w-full border text-sm font-bold rounded-xl p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer bg-slate-50 border-slate-300 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-amber-300"
               >
-                <option value="weight_desc"> Priporočeno</option>
-                <option value="newest">Najnovejši</option>
-                <option value="price_asc">Cena: naraščajoče</option>
-                <option value="price_desc">Cena: padajoče</option>
-                <option value="area_desc">Površina: največje</option>
+                <option value="weight_desc"> {st.recommended}</option>
+                <option value="newest">{st.newest}</option>
+                <option value="price_asc">{st.priceAsc}</option>
+                <option value="price_desc">{st.priceDesc}</option>
+                <option value="area_desc">{st.areaDesc}</option>
               </select>
             </div>
           </div>
@@ -418,7 +537,8 @@ function SearchContent() {
               minValue={filters.minPrice} 
               maxValue={filters.maxPrice} 
               maxLimit={maxPriceInDb}
-              onChange={(min, max) => { setCurrentPage(1); setFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max })); }} 
+              onChange={(min, max) => { setCurrentPage(1); setFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max })); }}
+              lang={language}
             />
           </div>
         </div>
@@ -428,8 +548,8 @@ function SearchContent() {
       <main className="grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
           <p className="text-sm font-medium uppercase tracking-wider text-slate-600 dark:text-slate-300">
-            Najdeno: <span className="font-bold text-lg text-amber-600 normal-case ml-1">{filteredListings.length}</span> oglasov
-            {totalPages > 1 && (<span className="ml-3 text-xs font-normal text-slate-400 dark:text-slate-500">— stran {currentPage}/{totalPages}</span>)}
+            {st.found}: <span className="font-bold text-lg text-amber-600 normal-case ml-1">{filteredListings.length}</span> {st.listings}
+            {totalPages > 1 && (<span className="ml-3 text-xs font-normal text-slate-400 dark:text-slate-500">— {st.page} {currentPage}/{totalPages}</span>)}
           </p>
         </div>
 
@@ -437,8 +557,8 @@ function SearchContent() {
           <div className="flex-1 min-w-0 w-full">
             {filteredListings.length === 0 ? (
               <div className="text-center py-20 border border-dashed rounded-2xl border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                <p className="text-base font-medium mb-3">Ni zadetkov za izbrane filtre.</p>
-                <button onClick={() => setFilters({ action: 'vse', type: 'vse', location: '', minPrice: null, maxPrice: null, sortBy: 'weight_desc' })} className="text-sm text-amber-500 underline cursor-pointer">Ponastavi filtre</button>
+                <p className="text-base font-medium mb-3">{st.noResults}</p>
+                <button onClick={() => setFilters({ action: 'vse', type: 'vse', location: '', minPrice: null, maxPrice: null, sortBy: 'weight_desc' })} className="text-sm text-amber-500 underline cursor-pointer">{st.resetFilters}</button>
               </div>
             ) : (
               <>
@@ -456,7 +576,7 @@ function SearchContent() {
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-white/20 bg-slate-950 flex-col gap-1.5">
                             <FontAwesomeIcon icon={faBuilding} className="text-3xl text-white/10" />
-                            <span className="text-[10px] uppercase font-bold tracking-wider">Ni slike</span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider">{st.noImage}</span>
                           </div>
                         )}
 
@@ -486,7 +606,7 @@ function SearchContent() {
                             onClick={() => setSelectedListing(listing)}
                             className="flex-1 text-center bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider py-3 px-4 rounded-xl transition-all text-xs shadow-lg shadow-amber-400/10 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
                           >
-                            <FontAwesomeIcon icon={faEye} /> Oglej oglas
+                            <FontAwesomeIcon icon={faEye} /> {st.viewListing}
                           </button>
                         </div>
                       </div>
@@ -561,7 +681,7 @@ function SearchContent() {
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20 bg-slate-950 flex-col gap-1.5">
                       <FontAwesomeIcon icon={faBuilding} className="text-3xl" />
-                      <span className="text-[10px] uppercase font-bold tracking-wider">Ni slike</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider">{st.noImage}</span>
                     </div>
                   )}
                   <span className="absolute top-3 left-3 bg-amber-400 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-md">
@@ -571,11 +691,11 @@ function SearchContent() {
 
                 <div className="flex-1 min-h-[240px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="text-amber-500" /> Lokacija nepremičnine (Okvirna)
+                    <FontAwesomeIcon icon={faMapMarkerAlt} className="text-amber-500" /> {st.approxLocation}
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none mt-6">
                     <span className="text-xs font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/5 shadow-sm">
-                      📍 Waypoint: {extractKraj(selectedListing.location)}
+                      📍 {st.waypoint}: {extractKraj(selectedListing.location)}
                     </span>
                   </div>
                 </div>
@@ -584,25 +704,25 @@ function SearchContent() {
               <div className="flex flex-col justify-between h-full space-y-5">
                 <div>
                   <div className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-1 capitalize w-100">
-                    {selectedListing.type || 'Nepremičnina'} • {selectedListing.status || 'Prodaja'}
+                    {selectedListing.type || st.property} • {selectedListing.status || st.sale}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
-                    {selectedListing.location || 'Neznan naslov'}
+                    {selectedListing.location || st.unknownAddress}
                   </h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Regija: {getRegion(selectedListing.location)}
+                    {st.region}: {getRegion(selectedListing.location)}
                   </p>
 
                   <div className="grid grid-cols-2 gap-3 my-4 border-y border-slate-100 dark:border-white/5 py-3 text-center">
                     <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-white/5">
-                      <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">Površina</span>
+                      <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">{st.area}</span>
                       <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-200">
                         <FontAwesomeIcon icon={faRulerCombined} className="text-amber-500 mr-1.5 text-xs" />
                         {selectedListing.area && selectedListing.area > 0 ? `${selectedListing.area} m²` : '/'}
                       </span>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-white/5">
-                      <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">Izvorna stran</span>
+                      <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">{st.sourceSite}</span>
                       <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-200 capitalize">
                         🏠 {selectedListing.site}
                       </span>
@@ -611,13 +731,13 @@ function SearchContent() {
 
                   <div className="flex items-baseline justify-between mb-2">
                     <div>
-                      <span className="text-xs text-slate-400 dark:text-slate-500 block">Oglaševana tržna cena</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 block">{st.advertisedPrice}</span>
                       <div className="text-3xl font-extrabold text-slate-900 dark:text-white">
-                        {formatListingPrice(selectedListing)}
+                        {formatListingPrice(selectedListing, st.byAgreement)}
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs text-slate-400 dark:text-slate-500 block">Izračun na m²</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 block">{st.pricePerM2}</span>
                       <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                         {formatPricePerM2(selectedListing)}
                       </div>
@@ -628,10 +748,10 @@ function SearchContent() {
                 <div className="bg-amber-500/5 dark:bg-amber-500/2 border border-amber-500/20 rounded-xl p-4 space-y-3.5">
                   <div className="flex items-center justify-between border-b border-amber-500/10 pb-2">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                      <FontAwesomeIcon icon={faCalculator} /> ETN Detaljna Analiza Con
+                      <FontAwesomeIcon icon={faCalculator} /> {st.etnTitle}
                     </div>
                     <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      Uradni podatki cone
+                      {st.officialData}
                     </span>
                   </div>
 
@@ -639,28 +759,28 @@ function SearchContent() {
                     <div className="space-y-3.5">
                       <div className="grid grid-cols-2 gap-4 text-xs">
                         <div>
-                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">Zgodovinsko povprečje ETN:</span>
+                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">{st.etnAvg}</span>
                           <span className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200">
                             {etnData.etnZoneAverage.toLocaleString('sl-SI')} €/m²
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">Tržno odstopanje:</span>
+                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">{st.marketDev}</span>
                           <span className="font-bold text-sm sm:text-base text-amber-600 dark:text-amber-400">
-                            +{etnData.deviation}% (Precenjeno)
+                            +{etnData.deviation}% ({st.overpriced})
                           </span>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 text-xs pt-2.5 border-t border-slate-100 dark:border-white/5">
                         <div>
-                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">Referenčna vrednost (ETN):</span>
+                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">{st.etnRef}</span>
                           <span className="font-semibold text-slate-700 dark:text-slate-300">
                             {etnData.etnEstimatedTotal.toLocaleString('sl-SI')} €
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">Ocenjen GURS davčni temelj:</span>
+                          <span className="text-slate-400 dark:text-slate-500 block mb-0.5">{st.gursTax}</span>
                           <span className="font-semibold text-slate-700 dark:text-slate-300">
                             {etnData.gursTaxBaseEstimate.toLocaleString('sl-SI')} €
                           </span>
@@ -669,7 +789,7 @@ function SearchContent() {
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 dark:text-slate-500">
-                      Ni zadostnih podatkov o kvadraturi ali ceni za preračun ETN mikrolokacije.
+                      {st.noEtnData}
                     </p>
                   )}
                 </div>
@@ -681,7 +801,7 @@ function SearchContent() {
                     rel="noopener noreferrer" 
                     className="flex-1 bg-amber-400 hover:bg-amber-500 text-slate-950 text-center font-bold py-3 px-4 rounded-xl text-sm transition-colors shadow-lg shadow-amber-400/10 flex items-center justify-center gap-2"
                   >
-                    Odpri izvorni oglas na {selectedListing.site} <FontAwesomeIcon icon={faExternalLinkAlt} className="text-xs" />
+                    {st.openListing} {selectedListing.site} <FontAwesomeIcon icon={faExternalLinkAlt} className="text-xs" />
                   </a>
                 </div>
 

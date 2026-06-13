@@ -6,18 +6,17 @@ import { useRouter } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
 import NavbarThemeToggle from './NavbarThemeToggle';
+import { useLanguage } from '../LanguageContext';
 
 export default function Navbar() {
   const router = useRouter();
-  const [language, setLanguage] = useState<'sl' | 'en'>('sl');
+  const { language, setLanguage } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const savedLang = localStorage.getItem('lang') as 'sl' | 'en' | null;
-    if (savedLang) setLanguage(savedLang);
     setMounted(true);
   }, []);
 
@@ -32,10 +31,7 @@ export default function Navbar() {
   }, []);
 
   const toggleLanguage = () => {
-    const newLang = language === 'sl' ? 'en' : 'sl';
-    setLanguage(newLang);
-    localStorage.setItem('lang', newLang);
-    window.location.reload();
+    setLanguage(language === 'sl' ? 'en' : 'sl');
   };
 
   const translations = {
@@ -51,7 +47,8 @@ export default function Navbar() {
       hisa: 'Hiše',
       poslovni: 'Poslovni prostori',
       vikend: 'Vikendi',
-      zemljisce: 'Zemljišča'
+      zemljisce: 'Zemljišča',
+      langLabel: 'English',
     },
     en: {
       home: 'Home',
@@ -65,7 +62,8 @@ export default function Navbar() {
       hisa: 'Houses',
       poslovni: 'Commercial Units',
       vikend: 'Weekend Houses',
-      zemljisce: 'Lands'
+      zemljisce: 'Lands',
+      langLabel: 'Slovenščina',
     }
   };
 
@@ -80,20 +78,20 @@ export default function Navbar() {
           <span>vesta<span className="text-amber-500">.si</span></span>
         </Link>
 
-        {/* Navigacijske povezave v zahtevanem vrstnem redu */}
+        {/* Desktop navigation */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
 
-         {/* 4. Domov */}
+         {/* Domov */}
           <Link href="/" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
             {t.home}
           </Link>
           
-          {/* 1. Nepremičnine */}
+          {/* Nepremičnine */}
           <Link href="/search" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
             {t.realestate}
           </Link>
 
-          {/* 2. Ponudba nepremičnin (Dropdown) */}
+          {/* Ponudba nepremičnin (Dropdown) */}
           <div className="relative" ref={dropdownRef}>
             <button 
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -115,25 +113,23 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* 3. Novogradnje */}
+          {/* Novogradnje */}
           <Link href="/search?filter=novogradnje" className="hover:text-amber-500 dark:hover:text-amber-400 transition-colors">
             {t.newbuilds}
           </Link>
 
-          
-
-          {/* 5. O projektu */}
+          {/* O projektu */}
           <Link href="/about" className="hover:text-amber-400 transition-colors">
             {t.about}
           </Link>
 
-          {/* 6. FAQ */}
+          {/* FAQ */}
           <Link href="/faq" className="hover:text-amber-400 transition-colors">
             {t.faq}
           </Link>
         </nav>
 
-        {/* Desni del (Gumb za temo + preklop jezika v stilu prejšnjega akcijskega gumba) */}
+        {/* Right side: theme toggle + language button + mobile hamburger */}
         <div className="flex items-center gap-4">
           <NavbarThemeToggle />
           
@@ -141,7 +137,7 @@ export default function Navbar() {
             onClick={toggleLanguage}
             className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-amber-400 dark:hover:bg-amber-300 dark:text-slate-950 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm cursor-pointer"
           >
-            {mounted ? (language === 'sl' ? 'English' : 'Slovenščina') : 'English'}
+            {mounted ? t.langLabel : 'English'}
           </button>
 
           {/* Mobilni Hamburger menu */}
@@ -174,8 +170,8 @@ export default function Navbar() {
 
           <Link href="/search?filter=novogradnje" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.newbuilds}</Link>
           <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.home}</Link>
-          <Link href="/#about" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.about}</Link>
-          <Link href="/#faq" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.faq}</Link>
+          <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.about}</Link>
+          <Link href="/faq" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.faq}</Link>
         </div>
       )}
     </header>

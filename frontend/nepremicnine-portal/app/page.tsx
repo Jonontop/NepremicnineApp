@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import CountUp from 'react-countup';
+import { useLanguage } from './LanguageContext';
 
 interface Property {
   id: string;
@@ -38,8 +39,82 @@ interface ActionStats {
   [key: string]: { prodaja: number; oddaja: number };
 }
 
+const translations = {
+  sl: {
+    portalLabel: 'Nepremičninski portal',
+    heroTitle1: 'Odkrijte bivalne',
+    heroTitle2: 'prostore',
+    heroTitle3: 'z značajem.',
+    heroDesc: 'Najcelovitejša zbirka nepremičnin v Sloveniji. Resnični podatki trga, agregirani iz preverjenih agencij brez podvajanja.',
+    activeAds: 'Aktivnih oglasov',
+    newbuilds: 'Novogradnje',
+    locations: 'Lokacij',
+    propertyLocation: 'Lokacija nepremičnine',
+    allSlovenia: 'Vsa Slovenija',
+    rooms: 'Število sob',
+    priceRange: 'Cenovni okvir (€)',
+    minPrice: 'Min cena',
+    maxPrice: 'Max cena',
+    searchBtn: 'Poišči nepremičnine',
+    apartment: 'Stanovanje',
+    house: 'Hiša',
+    commercial: 'Poslovni prostor',
+    weekend: 'Vikend',
+    categoryTitle: 'Poiščite ponudbo glede na vrsto nepremičnine',
+    poslovni: 'Poslovni prostori',
+    zemljisca: 'Zemljišča',
+    hise: 'Hiše',
+    stanovanja: 'Stanovanja',
+    forSale: 'Prodaja',
+    forRent: 'Oddaja',
+    premiumTitle: 'Najnovejša Premium Ponudba',
+    loading: 'Pridobivanje oglasov...',
+    noListings: 'V bazi trenutno ni top oglasov.',
+    details: 'Podrobnosti →',
+    showAll: 'Prikaži vse oglase →',
+    newbuild: 'Novogradnja',
+  },
+  en: {
+    portalLabel: 'Real Estate Portal',
+    heroTitle1: 'Discover living',
+    heroTitle2: 'spaces',
+    heroTitle3: 'with character.',
+    heroDesc: 'The most comprehensive collection of properties in Slovenia. Real market data aggregated from verified agencies without duplicates.',
+    activeAds: 'Active Listings',
+    newbuilds: 'New Builds',
+    locations: 'Locations',
+    propertyLocation: 'Property Location',
+    allSlovenia: 'All of Slovenia',
+    rooms: 'Number of Rooms',
+    priceRange: 'Price Range (€)',
+    minPrice: 'Min price',
+    maxPrice: 'Max price',
+    searchBtn: 'Search Properties',
+    apartment: 'Apartment',
+    house: 'House',
+    commercial: 'Commercial Space',
+    weekend: 'Weekend House',
+    categoryTitle: 'Find listings by property type',
+    poslovni: 'Commercial Units',
+    zemljisca: 'Lands',
+    hise: 'Houses',
+    stanovanja: 'Apartments',
+    forSale: 'For Sale',
+    forRent: 'For Rent',
+    premiumTitle: 'Latest Premium Listings',
+    loading: 'Loading listings...',
+    noListings: 'No top listings in the database yet.',
+    details: 'Details →',
+    showAll: 'Show all listings →',
+    newbuild: 'New Build',
+  },
+};
+
 export default function EstateMS() {
   const router = useRouter();
+  const { language } = useLanguage();
+  const t = translations[language];
+
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -118,6 +193,21 @@ export default function EstateMS() {
     }
   };
 
+  // Category data with translated labels
+  const categoryItems = [
+    { key: 'poslovni', label: t.poslovni, img: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80' },
+    { key: 'zemljisca', label: t.zemljisca, img: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80' },
+    { key: 'hise', label: t.hise, img: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80' },
+    { key: 'stanovanja', label: t.stanovanja, img: 'https://images.unsplash.com/photo-1597047084897-51e81819a499?auto=format&fit=crop&w=800&q=80' },
+  ];
+
+  const searchTypeOptions = [
+    { id: 'stanovanje', label: t.apartment },
+    { id: 'hisa', label: t.house },
+    { id: 'poslovni', label: t.commercial },
+    { id: 'vikend', label: t.weekend },
+  ];
+
   return (
     <div className="min-h-screen transition-colors duration-200 dark:bg-[#0f172a] dark:text-slate-100 bg-slate-100 text-slate-900">
       
@@ -132,15 +222,15 @@ export default function EstateMS() {
           <div className="lg:col-span-5 text-center lg:text-left flex flex-col items-center lg:items-start">
             <div className="flex items-center gap-3 mb-5 justify-center lg:justify-start">
               <span className="w-8 h-px bg-amber-400 hidden lg:block" />
-              <span className="text-amber-300 text-xs uppercase font-bold tracking-widest drop-shadow-lg">Nepremičninski portal</span>
+              <span className="text-amber-300 text-xs uppercase font-bold tracking-widest drop-shadow-lg">{t.portalLabel}</span>
             </div>
             <h1 className="text-white drop-shadow-lg text-4xl sm:text-6xl lg:text-7xl font-semibold leading-[1.12] mb-6">
-              Odkrijte bivalne<br />
-              <em className="text-amber-400 not-italic font-semibold">prostore</em><br />
-              z značajem.
+              {t.heroTitle1}<br />
+              <em className="text-amber-400 not-italic font-semibold">{t.heroTitle2}</em><br />
+              {t.heroTitle3}
             </h1>
             <p className="text-white/80 text-sm sm:text-base leading-relaxed max-w-md mb-8 mx-auto lg:mx-0">
-              Najcelovitejša zbirka nepremičnin v Sloveniji. Resnični podatki trga, agregirani iz preverjenih agencij brez podvajanja.
+              {t.heroDesc}
             </p>
             
             <div className="flex gap-4 sm:gap-6 border-t dark:border-slate-700 border-slate-200 pt-6 w-full max-w-sm justify-center lg:justify-start">
@@ -148,54 +238,49 @@ export default function EstateMS() {
                 <div className="text-white text-xl sm:text-2xl font-bold">
                   {animateStats ? <CountUp end={activeAdsCount} duration={1.3} separator="." /> : 0}
                 </div>
-                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">Aktivnih oglasov</div>
+                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">{t.activeAds}</div>
               </div>
               <div className="w-px dark:bg-slate-700 bg-slate-200" />
               <div className="text-center lg:text-left">
                 <div className="text-white text-xl sm:text-2xl font-bold">
                   {animateStats ? <CountUp end={newbuildCount} duration={1.3} separator="." /> : 0}
                 </div>
-                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">Novogradnje</div>
+                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">{t.newbuilds}</div>
               </div>
               <div className="w-px dark:bg-slate-700 bg-slate-200" />
               <div className="text-center lg:text-left">
                 <div className="text-white text-xl sm:text-2xl font-bold">
                   {animateStats ? <CountUp end={regionsCount} duration={1.3} separator="." /> : 0}
                 </div>
-                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">Lokacij</div>
+                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">{t.locations}</div>
               </div>
             </div>
           </div>
 
-          {/* Iskalna kartica - Centrirana in prilagojena za mobilce */}
+          {/* Search card */}
           <div className="lg:col-span-7 w-full max-w-xl mx-auto p-4 sm:p-6 md:p-9 rounded-2xl shadow-xl dark:bg-slate-900/95 dark:border dark:border-slate-700/80 bg-white border border-slate-200">
             <div className="flex gap-1.5 border-b border-slate-200 dark:border-slate-700 pb-4 mb-6 overflow-x-auto no-scrollbar scrollbar-none snap-x">
-              {[
-                { id: 'stanovanje', label: 'Stanovanje' },
-                { id: 'hisa', label: 'Hiša' },
-                { id: 'poslovni', label: 'Poslovni prostor' },
-                { id: 'vikend', label: 'Vikend' },
-              ].map((t) => (
+              {searchTypeOptions.map((opt) => (
                 <button
-                  key={t.id}
-                  onClick={() => setSearchType(t.id)}
-                  className={`px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold uppercase tracking-wider transition-all border whitespace-nowrap snap- Gaza ${searchType === t.id ? 'border-amber-400 bg-amber-400/10 text-amber-500 shadow-inner' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  key={opt.id}
+                  onClick={() => setSearchType(opt.id)}
+                  className={`px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold uppercase tracking-wider transition-all border whitespace-nowrap snap-start ${searchType === opt.id ? 'border-amber-400 bg-amber-400/10 text-amber-500 shadow-inner' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                 >
-                  {t.label}
+                  {opt.label}
                 </button>
               ))}
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">Lokacija nepremičnine</label>
+                <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">{t.propertyLocation}</label>
                 <div className="relative">
                   <select 
                     value={searchLocation} 
                     onChange={(e) => setSearchLocation(e.target.value)}
                     className="w-full border rounded-xl px-3 py-3 text-sm font-medium focus:outline-none focus:border-amber-400 appearance-none cursor-pointer dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 bg-slate-50 border-slate-300 text-slate-800"
                   >
-                    <option value="">Vsa Slovenija</option>
+                    <option value="">{t.allSlovenia}</option>
                     <option value="Ljubljana">Ljubljana</option>
                     <option value="Maribor">Maribor</option>
                     <option value="Koper">Koper</option>
@@ -207,7 +292,7 @@ export default function EstateMS() {
               </div>
 
               <div>
-                <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">Število sob</label>
+                <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">{t.rooms}</label>
                 <div className="flex gap-1 border p-1 rounded-xl dark:bg-slate-800 dark:border-slate-700 bg-slate-50 border-slate-300 w-full overflow-hidden">
                   {[1, 2, 3, 4, 5].map((num) => (
                     <button
@@ -224,18 +309,18 @@ export default function EstateMS() {
             </div>
 
             <div className="mb-6">
-              <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">Cenovni okvir (€)</label>
+              <label className="block text-slate-500 text-[11px] uppercase font-bold tracking-wider mb-2">{t.priceRange}</label>
               <div className="grid grid-cols-2 gap-3">
                 <input 
                   type="number" 
-                  placeholder="Min cena" 
+                  placeholder={t.minPrice} 
                   value={searchMinPrice}
                   onChange={(e) => setSearchMinPrice(e.target.value)}
                   className="w-full border rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-amber-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 bg-slate-50 border-slate-300"
                 />
                 <input 
                   type="number" 
-                  placeholder="Max cena" 
+                  placeholder={t.maxPrice} 
                   value={searchMaxPrice}
                   onChange={(e) => setSearchMaxPrice(e.target.value)}
                   className="w-full border rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-amber-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 bg-slate-50 border-slate-300"
@@ -244,7 +329,7 @@ export default function EstateMS() {
             </div>
 
             <button onClick={handleSearch} className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider py-3.5 rounded-xl text-xs sm:text-sm transition-all shadow-lg active:scale-[0.99]">
-              Poišči nepremičnine
+              {t.searchBtn}
             </button>
           </div>
         </div>
@@ -252,14 +337,9 @@ export default function EstateMS() {
 
       {/* ── KATEGORIJE TRGA ── */}
       <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24 bg-slate-300/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 mt-12">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-10 dark:text-white text-slate-900 text-center sm:text-left">Poiščite ponudbo glede na vrsto nepremičnine</h2>
+        <h2 className="text-3xl sm:text-4xl font-bold mb-10 dark:text-white text-slate-900 text-center sm:text-left">{t.categoryTitle}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { key: 'poslovni', label: 'Poslovni prostori', img: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80' },
-            { key: 'zemljisca', label: 'Zemljišča', img: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80' },
-            { key: 'hise', label: 'Hiše', img: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80' },
-            { key: 'stanovanja', label: 'Stanovanja', img: 'https://images.unsplash.com/photo-1597047084897-51e81819a499?auto=format&fit=crop&w=800&q=80' },
-          ].map((item) => {
+          {categoryItems.map((item) => {
             const typeMap: Record<string, string> = { poslovni: 'poslovni', zemljisca: 'zemljisce', hise: 'hisa', stanovanja: 'stanovanje' };
             const typeParam = typeMap[item.key] ?? '';
             return (
@@ -273,8 +353,8 @@ export default function EstateMS() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Link href={`/search?type=${typeParam}&action=prodaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-rose-500/10 hover:bg-rose-500/20 rounded-lg py-2 text-xs font-semibold text-rose-500 transition-colors">Prodaja {actionCounts[item.key]?.prodaja ?? 0}</Link>
-                  <Link href={`/search?type=${typeParam}&action=oddaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg py-2 text-xs font-semibold text-emerald-500 transition-colors">Oddaja {actionCounts[item.key]?.oddaja ?? 0}</Link>
+                  <Link href={`/search?type=${typeParam}&action=prodaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-rose-500/10 hover:bg-rose-500/20 rounded-lg py-2 text-xs font-semibold text-rose-500 transition-colors">{t.forSale} {actionCounts[item.key]?.prodaja ?? 0}</Link>
+                  <Link href={`/search?type=${typeParam}&action=oddaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg py-2 text-xs font-semibold text-emerald-500 transition-colors">{t.forRent} {actionCounts[item.key]?.oddaja ?? 0}</Link>
                 </div>
               </div>
             );
@@ -285,17 +365,17 @@ export default function EstateMS() {
       {/* ── PROPERTY GRID ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24" id="listings">
         <div className="flex items-center justify-between mb-10 text-center sm:text-left w-full">
-          <h2 className="text-3xl sm:text-4xl font-bold dark:text-white text-slate-900 w-full">Najnovejša Premium Ponudba</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold dark:text-white text-slate-900 w-full">{t.premiumTitle}</h2>
         </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest animate-pulse">Pridobivanje oglasov...</p>
+            <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest animate-pulse">{t.loading}</p>
           </div>
         ) : properties.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-slate-300 rounded-2xl bg-white/5">
-            <p className="text-slate-400 text-base font-medium">V bazi trenutno ni top oglasov.</p>
+            <p className="text-slate-400 text-base font-medium">{t.noListings}</p>
           </div>
         ) : (
           <>
@@ -304,7 +384,6 @@ export default function EstateMS() {
                 const isLiked = favorites.includes(property.id);
                 const isHighWeightPremium = property.weight >= 80 || property.isPremium;
                 
-                // Takojšnja zunanja preusmeritev ali fallback lokalno
                 const destinationUrl = property.link || `/property/${property.id}`;
                 const isExternal = !!property.link;
 
@@ -333,7 +412,7 @@ export default function EstateMS() {
                       </button>
                       <div className="absolute bottom-3 left-3">
                         <span className={`text-[11px] font-bold tracking-wider uppercase border rounded-md px-2.5 py-1 backdrop-blur-md ${getBadgeClass(property.badgeType)}`}>
-                          {property.filterTag === 'novogradnje' ? 'Novogradnja' : property.badgeText}
+                          {property.filterTag === 'novogradnje' ? t.newbuild : property.badgeText}
                         </span>
                       </div>
                     </div>
@@ -358,7 +437,7 @@ export default function EstateMS() {
                           rel={isExternal ? "noopener noreferrer" : undefined}
                           className="text-sm text-amber-400 font-semibold tracking-wider hover:underline"
                         >
-                          Podrobnosti →
+                          {t.details}
                         </a>
                       </div>
                     </div>
@@ -367,20 +446,20 @@ export default function EstateMS() {
               })}
             </div>
 
-            {/* Centriran mobilni gumb za prikaz preostalih oglasov */}
+            {/* Show all button */}
             <div className="flex justify-center mt-12 px-4">
               <Link
                 href="/search"
                 className="w-full sm:w-auto text-center bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider px-8 py-4 rounded-xl text-xs transition-all shadow-md hover:shadow-lg active:scale-98"
               >
-                Prikaži vse oglase <span>→</span>
+                {t.showAll}
               </Link>
             </div>
           </>
         )}
       </section>
 
-      {/* Sidra za About in FAQ sekciji bosta kasneje zapolnjeni z vsebino */}
+      {/* Anchors for About and FAQ sections */}
       <section id="about" className="max-w-7xl mx-auto px-4 sm:px-6 py-4" />
       <section id="faq" className="max-w-7xl mx-auto px-4 sm:px-6 py-4" />
 

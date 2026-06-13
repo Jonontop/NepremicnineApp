@@ -4,8 +4,7 @@
 	"name": "nepremicnineapp",
 	"compatibility_date": "2026-05-31",
 	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
+		"nodejs_compat"
 	],
 	"assets": {
 		"directory": ".open-next/assets",
@@ -23,5 +22,9 @@
 		// Enable image optimization
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
+	},
+	"vars": {
+		"NEXT_PUBLIC_SUPABASE_URL": "https://adfuejatruobubcjnnqx.supabase.co",
+		"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_JT3eFq2n1lMT7CUb3z7kqg_pOp-qvng"
 	}
 }

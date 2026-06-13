@@ -202,27 +202,28 @@ function mapHomeProperty(row: RawListing): HomeProperty {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const limitParam = Number(searchParams.get("limit") || "50");
-  const orderBy = searchParams.get("orderBy") || "posodobljeno_ob_desc";
-  const view = searchParams.get("view") || "raw";
+  try {
+    const { searchParams } = new URL(request.url);
+    const limitParam = Number(searchParams.get("limit") || "50");
+    const orderBy = searchParams.get("orderBy") || "posodobljeno_ob_desc";
+    const view = searchParams.get("view") || "raw";
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !key) {
-    return NextResponse.json(
-      {
-        error:
-          "Missing NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY).",
-      },
-      { status: 500 }
-    );
-  }
+    if (!url || !key) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY).",
+        },
+        { status: 500 }
+      );
+    }
 
-  const supabase = createClient(url, key);
+    const supabase = createClient(url, key);
   // Allow larger fetches from the frontend (cap at 1000 to avoid overly large responses)
   const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 1000) : 50;
 
@@ -307,4 +308,8 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json(rows);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
