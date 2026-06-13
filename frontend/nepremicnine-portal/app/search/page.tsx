@@ -177,7 +177,7 @@ function PriceRangeSlider({
       </div>
       <div className="flex justify-between text-[10px] text-slate-400">
         <span>0 €</span>
-        <span>{Math.getRound = Math.round(maxLimit / 2).toLocaleString('sl-SI')} €</span>
+        <span>{Math.round(maxLimit / 2).toLocaleString('sl-SI')} €</span>
         <span>Brez omejitve</span>
       </div>
     </div>
@@ -625,7 +625,7 @@ function SearchContent() {
                   </div>
                 </div>
 
-                <div className="bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/20 rounded-xl p-4 space-y-3.5">
+                <div className="bg-amber-500/5 dark:bg-amber-500/2 border border-amber-500/20 rounded-xl p-4 space-y-3.5">
                   <div className="flex items-center justify-between border-b border-amber-500/10 pb-2">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                       <FontAwesomeIcon icon={faCalculator} /> ETN Detaljna Analiza Con
