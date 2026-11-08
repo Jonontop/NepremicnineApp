@@ -25,9 +25,11 @@ def test_realinvest_is_documented_but_disabled():
     assert "realinvest" in {s.key for s in registry.specs()}
 
 
-def test_abc_is_not_marked_as_bulk():
-    assert registry.get_spec("abc").bulk is False
-    assert "abc" not in {spec.key for spec in registry.specs(bulk_only=True)}
+def test_every_enabled_source_does_a_full_scrape():
+    # Vir, ki bere samo prvo stran, mora imeti bulk=False in opombo.
+    enabled = registry.specs(enabled_only=True)
+    assert all(spec.bulk for spec in enabled)
+    assert {spec.key for spec in registry.specs(bulk_only=True)} == {s.key for s in enabled}
 
 
 def test_unknown_source_is_a_clear_error():
