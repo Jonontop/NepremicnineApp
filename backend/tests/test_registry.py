@@ -29,7 +29,10 @@ def test_every_enabled_source_does_a_full_scrape():
     # Vir, ki bere samo prvo stran, mora imeti bulk=False in opombo.
     enabled = registry.specs(enabled_only=True)
     assert all(spec.bulk for spec in enabled)
-    assert {spec.key for spec in registry.specs(bulk_only=True)} == {s.key for s in enabled}
+    # Filter bulk_only ne sme izločiti nobenega vklopljenega vira.
+    assert {spec.key for spec in registry.specs(enabled_only=True, bulk_only=True)} == {
+        spec.key for spec in enabled
+    }
 
 
 def test_unknown_source_is_a_clear_error():
