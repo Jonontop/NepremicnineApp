@@ -29,6 +29,7 @@ npm run build
 
 cd ../../backend
 python -m compileall -q .
+python -m pytest          # 92 testov, brez omrežja
 ```
 
 Mrežne teste (`test_fast.py`, `test_scrapers.py`) poženi, kadar spreminjaš scraperje — dostopajo do živih strani in baze.
@@ -74,18 +75,28 @@ Mrežne teste (`test_fast.py`, `test_scrapers.py`) poženi, kadar spreminjaš sc
    }
    ```
 
-4. Paginacija: beri strani, dokler ne dobiš prazne strani; omeji število strani (safety limit).
+4. Paginacija: beri strani, dokler ne dobiš prazne strani; omeji število strani (`max_pages`).
 5. Deduplikacija znotraj vira: preskoči ponovljene `link`.
 6. Filtriraj po `buy` (prodaja/oddaja) — stran, ki jo bereš, mora ustrezati `status`.
-7. Preveri rezultat:
+7. Razčlenjevanje ene kartice daj v ločeno metodo (`_parse_card` oz. `_parse_listing_card`) in dodaj `parse_page(soup)`, ki vrne seznam oglasov. Tako lahko parser testiraš na shranjeni strani brez omrežja:
+
+   ```python
+   def test_parse_moj_vir():
+       soup = BeautifulSoup(fixture("moj_vir_page.html").read_text(), "html.parser")
+       listings = MojScraper().parse_page(soup)
+       assert listings[0]["price"] == 189000
+   ```
+8. Preveri rezultat:
 
    ```bash
    cd backend
-   python -c "from scrapers.<vir> import <Klasa>; r=<Klasa>().scrape(buy=True); print(len(r), r[:1])"
+   python -c "from scrapers.<vir> import <Klasa>; r=<Klasa>().scrape_listings(buy=True); print(r.summary())"
    ```
 
-8. Dodaj vir v `KNOWN_SITES` v `app/api/scraper-health/route.ts`, v tabelo v `README.md` in v `main.py`/`run_scraper.py`.
-9. Če vir ne deluje zanesljivo, ga ne vključi v produkcijski cikel — dokumentiraj ga kot eksperimentalnega (kot `realinvest.py`).
+9. Prijavi vir v `scrapers/registry.py` (`SourceSpec`). `main.py` in `run_scraper.py` ga od tam naprej poganjata sama — ne dodajaj novih uvozov v ti dve datoteki. Če vir še ni preverjen, nastavi `enabled=False` (kot `realinvest`) ali `bulk=False`.
+10. Dodaj vir v `KNOWN_SITES` v `app/api/scraper-health/route.ts` in v tabelo v `README.md`.
+11. Dodaj vsaj en fixture test v `backend/tests/test_sources.py`.
+12. Če vir ne deluje zanesljivo, ga ne vključi v produkcijski cikel — dokumentiraj ga kot eksperimentalnega.
 
 ## Commit sporočila
 

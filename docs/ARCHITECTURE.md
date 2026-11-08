@@ -14,16 +14,42 @@ Dokument opisuje, kako so podatki povezani od vira do uporabnikovega zaslona, in
 
 Frontend **nikoli** ne piše v bazo in nikoli ne vidi service-role ključa.
 
+## Skupna pogodba
+
+Trije moduli določajo, kaj je "en oglas", ne glede na vir:
+
+| Modul | Vsebina |
+|-------|---------|
+| `scrapers/models.py` | `SearchQuery` (kaj iščemo), `Listing` (normiran oglas), `ScrapeResult` (izid enega zagona) |
+| `scrapers/normalizers.py` | čiste funkcije za ceno, površino, enoto, leto, URL, status in tip |
+| `scrapers/registry.py` | en seznam resnice: kateri viri obstajajo, kateri so vklopljeni, kateri podpirajo polni zajem |
+
+Zato `main.py` in `run_scraper.py` ne uvažata več posameznih scraperjev — vire dobita iz registra (`registry.build_all()`), `tests/test_registry.py` pa preveri, da se vsak vklopljen vir da ustvariti.
+
+`ScrapeResult` je vedno vrnjen, tudi ko vir odpove:
+
+```python
+result = scraper.scrape_listings(buy=True)
+result.ok          # False, če je scrape() vrgel izjemo
+result.error       # "Timeout: ..."
+result.listings    # list[Listing]
+result.storable    # le oglasi s ceno, krajem in povezavo
+result.summary()   # ena vrstica za dnevnik
+```
+
 ## Zajem: `BaseScraper`
 
 `scrapers/base_scraper.py` ponuja:
 
-- `_get_soup(url)` — naključen premor 1–3 s, rotacija User-Agent, `timeout=10`, ob napaki vrne `None` (scraper takrat zaključi paginacijo).
+- `_get(url)` — `timeout=15`, do `max_retries=2` ponovitve z exponential backoff (največ 30 s), upošteva `Retry-After` pri 429, ob 404 vrne `None` (oglas je potekel), ob drugih 4xx/5xx zabeleži in vrne `None`.
+- `_get_soup(url)` — kot zgoraj + `BeautifulSoup`; povečuje `pages_fetched`.
+- `_throttle()` — naključen premor `min_delay`–`max_delay` (privzeto 1–2,5 s) med zahtevami istega vira.
 - `clean_price(text)` — odstrani enote, obdrži prvo vrednost iz razpona (`547.522 - 591.067 €` → `547522`), zavrne nerealne vrednosti (> 50.000.000 €).
 - `clean_area(text)` — vejico pretvori v piko, pobere prvo število.
-- `detect_price_unit(text)` — `per_m2`, če besedilo vsebuje `€/m`, `/m2`, `m²`.
+- `detect_price_unit(text)` — `per_m2` samo pri `€/m2`, `/m²` ipd.; najemnina `1.200 €/mesec` ostane `total`.
 - `extract_year(text)` — 4-mestno leto v razponu 1850–2039.
 - `absolute_url(href)` — absolutne povezave pusti, protocol-relative (`//cdn…`) dopolni, relativne pripne na `base_url`.
+- `scrape_listings(buy=…, query=…)` — ovije `scrape()` v `ScrapeResult` in izjeme spremeni v `result.error`.
 - `extract_detail_page(soup)` — privzeti fallback za repair (OG meta cena/slika).
 
 Vsak scraper implementira `scrape(buy=True, **kwargs)` in vrne seznam slovarjev:
@@ -49,7 +75,7 @@ Vsak scraper implementira `scrape(buy=True, **kwargs)` in vrne seznam slovarjev:
 
 `main.py` → `celoten_zagon_strganja()`:
 
-1. Za `buy in (True, False)` požene vseh 9 scraperjev; izjema enega vira se samo zabeleži.
+1. Za `buy in (True, False)` požene vse vire iz `registry.specs(enabled_only=True)` (trenutno 9); vsak vrne `ScrapeResult`, izjema enega vira se zabeleži v `result.error` in ne ustavi cikla. Viri, ki odpovejo, se po koncu cikla pošljejo tudi po e-pošti (če je SMTP nastavljen).
 2. `save_to_database()` — najprej validacija (`save_to_database` izloči cene ≤ 0, kraj `N/A`/prazen, prazen link; neobvezno pošlje SMTP poročilo), nato:
    - primarno `psycopg2` + `execute_values` z `ON CONFLICT (link) DO UPDATE`,
    - ob napaki ali brez `SUPABASE_DB_URI` REST API (`/rest/v1/nepremicnine_oglasi`, `on_conflict=link`, batch 100).
@@ -59,7 +85,19 @@ Vsak scraper implementira `scrape(buy=True, **kwargs)` in vrne seznam slovarjev:
 
 Fazi 3 in 4 zahtevata `SUPABASE_DB_URI`; brez nje se preskočita z jasnim sporočilom.
 
-`clean_status(raw)` preslika poljuben zapis v `prodaja` / `oddaja` / `drugo` (ključne besede: prod/offer/nakup, odd/najem/rent).
+`clean_status(raw)` preslika poljuben zapis v `prodaja` / `oddaja` / `drugo` (ključne besede: prod/offer/nakup, odd/najem/rent; prepozna tudi razmaknjene črke). Implementacija je v `normalizers.normalize_status`.
+
+## Testi
+
+`backend/tests/` teče s `python -m pytest` in **ne** dostopa do omrežja:
+
+- `test_normalizers.py` — slovenski zapisi cen, površin, enot, letnic, statusov in povezav.
+- `test_models.py` — pretvorba starega slovarja v `Listing` in nazaj, `is_storable`, `SearchQuery`.
+- `test_base_scraper.py` — ponovni poskusi (503 → 200), 404 brez ponovitve, `Retry-After`, izjeme, `pages_fetched`.
+- `test_registry.py` — vsak vklopljen vir se da ustvariti, ključi so unikatni, `realinvest` je izklopljen.
+- `test_sources.py` — `si21` in `mestonepremicnin` na shranjenih straneh v `tests/fixtures/`.
+
+Mrežni skripti `test_fast.py` in `test_scrapers.py` ostajata za ročno preverjanje živih virov.
 
 ## Branje: API routes
 

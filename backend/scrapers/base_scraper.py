@@ -1,140 +1,218 @@
+"""Skupna osnova za vse scraperje.
+
+Nudi:
+- enotno sestavljanje povezav (`absolute_url`),
+- normalizacijo cen/površin prek `normalizers`,
+- omejeno število poskusov z exponential backoff in upoštevanjem `Retry-After`,
+- počasen, omejen dostop do virov (`min_delay`/`max_delay`),
+- `scrape_listings()`, ki vrne tipiziran `ScrapeResult` in nikoli ne vrže
+  izjeme naprej (vir, ki pade, ne ustavi ostalih).
+"""
+
+from __future__ import annotations
+
+import logging
+import random
+import time
+
 import requests
 from bs4 import BeautifulSoup
-import re
-import time
-import random
+
+from . import normalizers as nz
+from .models import ScrapeResult, SearchQuery
+
+logger = logging.getLogger("nepremicnine.scraper")
+
+#: Kode, pri katerih je smiselno poskusiti znova.
+RETRYABLE_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+#: Zgornja meja čakanja med poskusi (sekunde).
+MAX_BACKOFF = 30.0
+
+USER_AGENTS = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+)
+
 
 class BaseScraper:
-    def __init__(self, name, base_url):
+    #: Premor med zahtevami, da ne obremenjujemo vira.
+    min_delay = 1.0
+    max_delay = 2.5
+    request_timeout = 15
+    #: Število ponovnih poskusov poleg prvega.
+    max_retries = 2
+
+    def __init__(self, name, base_url, min_delay=None, max_delay=None):
         self.name = name
-        self.base_url = base_url
+        self.base_url = str(base_url).rstrip("/")
+        if min_delay is not None:
+            self.min_delay = float(min_delay)
+        if max_delay is not None:
+            self.max_delay = float(max_delay)
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept-Language": "sl-SI,sl;q=0.9,en;q=0.8",
         }
+        self.session = requests.Session()
+        self.pages_fetched = 0
+        self._last_request_at = 0.0
+
+    # ------------------------------------------------------------------
+    # Omrežje
+    # ------------------------------------------------------------------
+    def _throttle(self):
+        """Zagotovi minimalni premor med dvema zahtevama istega vira."""
+        if self.max_delay <= 0:
+            return
+        delay = random.uniform(self.min_delay, self.max_delay)
+        elapsed = time.monotonic() - self._last_request_at
+        if elapsed < delay:
+            time.sleep(delay - elapsed)
+
+    @staticmethod
+    def _retry_after_seconds(response):
+        raw = response.headers.get("Retry-After") if response is not None else None
+        try:
+            return min(float(raw), MAX_BACKOFF)
+        except (TypeError, ValueError):
+            return None
+
+    def _get(self, url, **kwargs):
+        """Prenese URL z omejenimi ponovitvami; vrne `Response` ali `None`."""
+        for attempt in range(self.max_retries + 1):
+            self._throttle()
+            self.headers["User-Agent"] = random.choice(USER_AGENTS)
+            try:
+                response = self.session.get(
+                    url, headers=self.headers, timeout=self.request_timeout, **kwargs
+                )
+                self._last_request_at = time.monotonic()
+            except requests.RequestException as exc:
+                self._last_request_at = time.monotonic()
+                if attempt >= self.max_retries:
+                    logger.warning("[%s] Prenos ni uspel (%s): %s", self.name, url, exc)
+                    return None
+                backoff = min(2.0 ** attempt, MAX_BACKOFF)
+                logger.info(
+                    "[%s] Ponovni poskus %s/%s čez %.1fs: %s",
+                    self.name, attempt + 1, self.max_retries, backoff, url,
+                )
+                time.sleep(backoff)
+                continue
+
+            if response.status_code in RETRYABLE_STATUS and attempt < self.max_retries:
+                backoff = self._retry_after_seconds(response) or min(
+                    2.0 ** attempt, MAX_BACKOFF
+                )
+                logger.info(
+                    "[%s] HTTP %s, čakam %.1fs in poskusim znova: %s",
+                    self.name, response.status_code, backoff, url,
+                )
+                time.sleep(backoff)
+                continue
+
+            if response.status_code == 404:
+                logger.info("[%s] 404 (oglas ne obstaja več): %s", self.name, url)
+                return None
+            if response.status_code >= 400:
+                logger.warning(
+                    "[%s] HTTP %s pri %s", self.name, response.status_code, url
+                )
+                return None
+            return response
+        return None
 
     def _get_soup(self, url):
-        """Skupna metoda za prenos strani z vgrajeno zaščito pred blokado."""
-        # 1. Naključni premor med 1 in 3 sekundami, da ne streljaš requestov prehitro
-        time.sleep(random.uniform(1.0, 3.0))
-        
-        # 2. Rotacija User-Agentov (strežnik misli, da prihajajo različni brskalniki)
-        user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
-        ]
-        self.headers["User-Agent"] = random.choice(user_agents)
-
-        try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            response.raise_for_status()
-            return BeautifulSoup(response.text, 'html.parser')
-        except Exception as e:
-            print(f"[{self.name}] Napaka pri prenosu URL {url}: {e}")
+        """Prenese stran in vrne `BeautifulSoup` (ali `None` ob napaki)."""
+        response = self._get(url)
+        if response is None:
             return None
+        self.pages_fetched += 1
+        return BeautifulSoup(response.text, "html.parser")
 
+    # ------------------------------------------------------------------
+    # Normalizacija (tanke ovitke okoli `normalizers`)
+    # ------------------------------------------------------------------
     def absolute_url(self, href):
-        """Pretvori povezavo iz oglasa v absolutni URL.
-
-        Absolutne povezave pustimo pri miru (prej so se podvojile v
-        "https://portal/https://portal/..."), protocol-relative dopolnimo,
-        relativne pa pripnemo na base_url.
-        """
-        if not href:
-            return ""
-        href = str(href).strip()
-        if href.startswith("http://") or href.startswith("https://"):
-            return href
-        if href.startswith("//"):
-            return "https:" + href
-        if not href.startswith("/"):
-            href = "/" + href
-        return self.base_url + href
+        """Pretvori povezavo iz oglasa v absolutni URL brez podvajanja."""
+        return nz.join_url(self.base_url, href)
 
     def clean_price(self, price_text):
-        """ Pretvori tekstualno ceno v celo število in pravilno reši razpone (npr. 547.522 - 591.067 €) """
-        if not price_text or price_text == "N/A":
-            return 0
-        if isinstance(price_text, int):
-            return price_text if price_text < 50000000 else 0
-        
-        price_str = str(price_text).strip()
-        
-        # 🌟 REŠITEV ZA RAZPONE (Novogradnje): 
-        # Če string vsebuje vezaj/črtico (-, –, —), pomeni da gre za razpon cen!
-        # Splitamo ob vezaju in vzamemo samo PRVI del (minimalno ceno).
-        for separator in ['-', '–', '—']:
-            if separator in price_str:
-                price_str = price_str.split(separator)[0].strip()
-                break # Uspešno smo zgrabili začetno ceno, gremo naprej na čiščenje
-
-        # Odstrani enoto cene na m2 (npr. '/m²', '/m2', '€/m2')
-        # da ne pobere '2' iz 'm2' kot del cene
-        import re
-        price_str = re.sub(r'/m[²2]', '', price_str)
-
-        # Popravek za decimalne cente (če obstajajo za vejico)
-        if ',' in price_str:
-            parts = price_str.split(',')
-            if len(parts) > 1 and len(parts[1].strip().split()[0]) == 2:
-                price_str = parts[0]
-
-        # Sedaj varno poberemo številke samo iz PRVEGA dela cene
-        # Uporabimo regex namesto str.isdigit(), ker Python 3
-        # treatsa Unicode številke (npr. ²) kot.isdigit()==True
-        numeric_price = re.sub(r'[^0-9]', '', price_str)
-        cena = int(numeric_price) if numeric_price else 0
-        
-        # Končna varovalka za ekstremne sistemske napake
-        if cena > 50000000:
-            print(f"⚠️ [Opozorilo] Zaznana nerealna cena ({cena} €). Nastavljam na 0.")
-            return 0
-            
-        return cena
+        return nz.clean_price(price_text)
 
     def clean_area(self, area_text):
-        """Pretvori tekstualno kvadraturo v float."""
-        if not area_text or area_text == "N/A":
-            return 0.0
-        if isinstance(area_text, (int, float)):
-            return float(area_text)
-        area_text = str(area_text).replace(',', '.')
-        match = re.search(r"[-+]?\d*\.\d+|\d+", area_text)
-        return float(match.group()) if match else 0.0
+        return nz.clean_area(area_text)
 
     def detect_price_unit(self, price_text):
-        """Vrne 'per_m2', kadar je cena zapisana kot cena na kvadratni meter."""
-        text = str(price_text or "").lower()
-        per_m2_markers = ["€/m", "eur/m", "euro/m", "/m2", "/m²", "m2", "m²"]
-        return "per_m2" if any(marker in text for marker in per_m2_markers) else "total"
+        return nz.detect_price_unit(price_text)
 
     def extract_year(self, text):
-        """Poišče realističen letnik gradnje v besedilu."""
-        if not text:
-            return None
-        match = re.search(r"\b(18[5-9]\d|19\d{2}|20[0-3]\d)\b", str(text))
-        return int(match.group(1)) if match else None
-    
+        return nz.extract_year(text)
+
     def extract_detail_page(self, soup):
-        """
-        Privzeta metoda za pridobivanje manjkajočih podatkov iz podstrani.
-        Če child class nima svoje logike, se izvede ta fallback preko OG meta oznak.
-        """
+        """Fallback za manjkajoče podatke iz OG meta oznak na podstrani."""
         data = {}
-        
-        # Poskusimo ujeti ceno iz meta oznak
-        price_meta = soup.find("meta", property="og:price:amount") or soup.find("meta", property="product:price:amount")
+
+        price_meta = soup.find("meta", property="og:price:amount") or soup.find(
+            "meta", property="product:price:amount"
+        )
         if price_meta and price_meta.get("content"):
-            data["price"] = self.clean_price(price_meta["content"])
-            
-        # Poskusimo ujeti sliko iz meta oznak
+            data["price"] = nz.clean_price(price_meta["content"])
+
         img_meta = soup.find("meta", property="og:image")
         if img_meta and img_meta.get("content"):
             data["image"] = img_meta["content"].strip()
-            
+
         return data
 
-    
-
+    # ------------------------------------------------------------------
+    # Rezultat
+    # ------------------------------------------------------------------
     def scrape(self, limit=5, buy=True, property_type="flat", **kwargs):
-        raise NotImplementedError("Vsak scraper mora implementirati svojo 'scrape' metodo!")
+        raise NotImplementedError(
+            "Vsak scraper mora implementirati svojo 'scrape' metodo!"
+        )
+
+    def scrape_listings(self, buy=None, query: SearchQuery | None = None, **kwargs) -> ScrapeResult:
+        """Požene `scrape()` in vrne tipiziran rezultat.
+
+        Napake vira so zabeležene v `ScrapeResult.error`, da klicatelj
+        (registry, main.py) nadaljuje z ostalimi viri.
+        """
+        if query is None:
+            query = SearchQuery(transaction="sale" if buy is not False else "rent")
+        elif buy is not None:
+            query = SearchQuery(
+                transaction="sale" if buy else "rent",
+                property_types=query.property_types,
+                max_pages=query.max_pages,
+                limit=query.limit,
+            )
+
+        self.pages_fetched = 0
+        started = time.perf_counter()
+        try:
+            rows = self.scrape(buy=query.buy, **kwargs) or []
+        except Exception as exc:  # vir ne sme podreti celotnega cikla
+            logger.exception("[%s] Scraper je odpovedal", self.name)
+            return ScrapeResult(
+                source=self.name,
+                error=f"{type(exc).__name__}: {exc}",
+                pages_fetched=self.pages_fetched,
+                duration_s=time.perf_counter() - started,
+            )
+
+        result = ScrapeResult.from_legacy(
+            self.name,
+            rows,
+            pages_fetched=self.pages_fetched,
+            duration_s=time.perf_counter() - started,
+        )
+        if result.rejected:
+            result.warnings.append(
+                f"{len(result.rejected)} oglasov brez cene, kraja ali povezave"
+            )
+        logger.info(result.summary())
+        return result

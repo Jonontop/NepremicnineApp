@@ -29,6 +29,7 @@ Cilj: ponovno vzpostaviti zanesljivo bazo in preprečiti tihe okvare.
 - [ ] Rotiraj service-role ključ, če je bil kdaj deljen izven strežnika; preveri, da v repozitoriju ni skrivnosti.
 - [ ] Dodaj CI (GitHub Actions): `npm ci`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, `python -m compileall`.
 - [ ] Prevedi `test_fast.py` / `test_scrapers.py` v pytest z markerjem `network` (privzeto izklopljeno v CI, ročno pred izdajo).
+- [x] Osnovni pytest suite brez omrežja (`backend/tests/`, 92 testov, fixtures).
 - [ ] Dodaj strukturirane loge (JSON) in dnevno poročilo: uspeh/neuspeh po viru, št. novih/posodobljenih/potečenih.
 - [ ] Monitoring: uptime check `/api/properties` + alarm, če vir ne vrne nič 24 h.
 
@@ -40,12 +41,14 @@ Cilj: ponovno vzpostaviti zanesljivo bazo in preprečiti tihe okvare.
 
 Cilj: manj smeti v bazi in boljša uporabniška izkušnja brez ročnega čiščenja.
 
-- [ ] Skupni modul za validacijo (`backend/validation.py`): tip nepremičnine, smiselna cena glede na tip (zemljišče ≠ stanovanje), površina > 0, leto izgradnje v razponu.
+- [x] Skupni modeli in normalizatorji (`scrapers/models.py`, `scrapers/normalizers.py`) z validacijo na ravni `Listing`.
+- [ ] Dopolnitev validacije po tipu (`backend/validation.py`): smiselna cena glede na tip (zemljišče ≠ stanovanje), površina > 0, leto izgradnje v razponu.
 - [ ] Vključi `normalize_locations.py` kot fazo ciklusa (trenutno je ročni skript z dry-run).
 - [ ] Fuzzy deduplikacija prek vira: isto jedro oglasa na več portalih (naslov + kraj + površina ±2 m² + cena ±2 %) → en "master" oglas z več viri.
 - [ ] Življenjski cikel oglasa: `prvič_videno`, `zadnjič_videno`, `potečeno_ob`; oglas postane `potečeno` po N neuspešnih ciklih, ne takoj ob 404 (začasne napake).
 - [ ] Zgodovina kakovosti: tabela `scraper_runs` (vir, začetek, trajanje, najdeno, shranjeno, napake) — podlaga za graf na dashboardu.
-- [ ] Retry z exponential backoff za HTTP 429/5xx; spoštuj `Retry-After`; ob 403 začasno ustavi vir za 24 h.
+- [x] Retry z exponential backoff za HTTP 429/5xx in upoštevanje `Retry-After` (v `BaseScraper._get`).
+- [ ] Ob 403 začasno ustavi vir za 24 h (circuit breaker med viri).
 - [ ] Pravna preveritev: `robots.txt`, pogoji uporabe virov, navedba vira pri vsakem oglasu (že prisotna).
 
 **Merilo:** delež oglasov brez cene/slike pade pod 2 %; podvojene slike < 0,5 %; vsak scraper ima vidno zgodovino uspešnosti.

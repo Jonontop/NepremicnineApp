@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 import random
 import os
@@ -9,16 +10,9 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 import schedule  # Knjižnica za časovnike
 
-# Uvozi tvoje scraperje
-from scrapers.abcnepremicnine import AbcScraper
-from scrapers.galea import GaleaScraper
-from scrapers.si21 import Si21Scraper
-from scrapers.mestonepremicnin import MestoScraper
-from scrapers.siol import SiolScraper
-from scrapers.ljubljanaNepremicnine import LjubljanaScraper
-from scrapers.insa import InsaScraper
-from scrapers.simobilia import SimobiliaScraper
-from scrapers.solterra import SolTerraScraper
+# Viri so definirani na enem mestu (scrapers/registry.py)
+from scrapers import registry
+from scrapers.normalizers import normalize_status
 
 # Naloži okoljske spremenljivke
 load_dotenv()
@@ -33,14 +27,8 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         raise ValueError("[X] Napaka: Potrebujete SUPABASE_DB_URI ali SUPABASE_URL + SUPABASE_SERVICE_KEY!")
 
 def clean_status(raw_status):
-    if not raw_status:
-        return "drugo"
-    status_clean = str(raw_status).lower().strip()
-    if "prod" in status_clean or "offer" in status_clean or "nakup" in status_clean:
-        return "prodaja"
-    elif "odd" in status_clean or "najem" in status_clean or "rent" in status_clean:
-        return "oddaja"
-    return "drugo"
+    """Ohranjeno zaradi združljivosti; logika je v normalizers."""
+    return normalize_status(raw_status)
 
 def dnevno_ciscenje_podvojenih_slik():
     if not DB_URI:
@@ -96,14 +84,16 @@ def popravi_manjkajoce_podatke():
 
         print(f"[i] Najdenih {len(incomplete_listings)} nepopolnih oglasov. Začenjam popravilo...")
 
-        scrapers_pool = {
-            "galea": GaleaScraper(),
-            "si21": Si21Scraper(),
-            "siol": SiolScraper(),
-            "ljubljana": LjubljanaScraper(),
-            "abc": AbcScraper(),
-            "mestonepremicnin": MestoScraper()
-        }
+        scrapers_pool = {}
+        for spec in registry.specs(enabled_only=True):
+            try:
+                scraper = spec.build()
+            except Exception as exc:
+                print(f"    [!] Scraper {spec.key} se ne naloži: {exc}")
+                continue
+            # V bazi je lahko zapisan kratek ključ ali polno ime vira.
+            scrapers_pool[spec.key] = scraper
+            scrapers_pool[scraper.name.lower()] = scraper
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
         for row in incomplete_listings:
@@ -328,34 +318,33 @@ def save_to_database(listings):
 def celoten_zagon_strganja():
     print("\n=========================================")
     
-    scrapers = [
-        GaleaScraper(),
-        Si21Scraper(),
-        SiolScraper(),
-        LjubljanaScraper(),
-        MestoScraper(),
-        AbcScraper(),
-        InsaScraper(),
-        SimobiliaScraper(),
-        SolTerraScraper(),
-    ]
+    scrapers = registry.build_all(enabled_only=True)
     all_listings = []
+    run_report = []
 
     for buy in [True, False]:
         buy_str = "PRODAJA" if buy else "ODDAJA"
         for scraper in scrapers:
             print(f"\n[+] Poganjam vir: {scraper.name.upper()} ({buy_str})")
-            try:
-                results = scraper.scrape(buy=buy)
-                for item in results:
-                    all_listings.append(item)
-                print(f"[✓] {scraper.name} vrnil {len(results)} oglasov za obdelavo.")
-                time.sleep(random.uniform(1.5, 3.5))
-            except Exception as e:
-                print(f"[X] Napaka pri izvajanju scraperja {scraper.name}: {e}")
+            result = scraper.scrape_listings(buy=buy)
+            run_report.append(result)
+            all_listings.extend(result.legacy_listings())
+            if result.ok:
+                print(f"[✓] {result.summary()}")
+            else:
+                print(f"[X] {result.summary()}")
+            time.sleep(random.uniform(1.5, 3.5))
 
     # Shranimo vse v bazo (Trigger bo poskrbel za zgodovino cen)
     save_to_database(all_listings)
+
+    # Vir, ki je odpovedal, mora biti viden, ne samo v dnevniku.
+    neuspesni = [result for result in run_report if not result.ok]
+    if neuspesni:
+        send_admin_email(
+            f"{len(neuspesni)} vir(ov) ni vrnilo podatkov",
+            "\n\n".join(result.summary() for result in neuspesni),
+        )
     
     # Poflikamo luknje
     popravi_manjkajoce_podatke()
@@ -370,6 +359,10 @@ schedule.every().day.at("05:00").do(celoten_zagon_strganja)
 schedule.every().day.at("17:00").do(celoten_zagon_strganja)
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     print("==================================================")
     print(" 🤖 SISTEM ZA 24/7 SPREMLJANJE NEPREMIČNIN ZAGANAN ")
     print("==================================================")

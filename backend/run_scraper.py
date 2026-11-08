@@ -16,26 +16,13 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-from scrapers.abcnepremicnine import AbcScraper
-from scrapers.galea import GaleaScraper
-from scrapers.si21 import Si21Scraper
-from scrapers.mestonepremicnin import MestoScraper
-from scrapers.siol import SiolScraper
-from scrapers.ljubljanaNepremicnine import LjubljanaScraper
-from scrapers.insa import InsaScraper
-from scrapers.simobilia import SimobiliaScraper
-from scrapers.solterra import SolTerraScraper
+from scrapers import registry
+from scrapers.normalizers import normalize_status
 
 
 def clean_status(raw_status):
-    if not raw_status:
-        return "drugo"
-    s = str(raw_status).lower().strip()
-    if "prod" in s or "offer" in s or "nakup" in s:
-        return "prodaja"
-    elif "odd" in s or "najem" in s or "rent" in s:
-        return "oddaja"
-    return "drugo"
+    """Ohranjeno zaradi združljivosti; logika je v normalizers."""
+    return normalize_status(raw_status)
 
 
 def save_batch(listings):
@@ -101,17 +88,8 @@ def save_batch(listings):
 
 
 def main():
-    scrapers = [
-        ("SIOL", SiolScraper()),
-        ("MESTO", MestoScraper()),
-        ("LJUBLJANA", LjubljanaScraper()),
-        ("ABC", AbcScraper()),
-        ("GALEA", GaleaScraper()),
-        ("SI21", Si21Scraper()),
-        ("INSA", InsaScraper()),
-        ("SIMOBILIA", SimobiliaScraper()),
-        ("SOLTERRA", SolTerraScraper()),
-    ]
+    # Vire določa register (scrapers/registry.py), ne ta datoteka.
+    scrapers = registry.build_all(enabled_only=True)
 
     grand_total = 0
     grand_saved = 0
@@ -123,20 +101,19 @@ def main():
         print(f"  {mode}")
         print(f"{'='*50}")
 
-        for name, scraper in scrapers:
-            print(f"\n[+] {name} ({mode})")
+        for scraper in scrapers:
+            print(f"\n[+] {scraper.name.upper()} ({mode})")
             t0 = time.time()
-            try:
-                results = scraper.scrape(buy=buy)
-                elapsed = time.time() - t0
-                print(f"  Scraped {len(results)} listings in {elapsed:.0f}s")
+            result = scraper.scrape_listings(buy=buy)
+            print(f"  {result.summary()}")
+            for warning in result.warnings:
+                print(f"  [!] {warning}")
 
-                saved = save_batch(results)
-                grand_total += len(results)
-                grand_saved += saved
-                print(f"  Saved {saved} to database")
-            except Exception as e:
-                print(f"  [X] Error: {e}")
+            results = result.legacy_listings()
+            saved = save_batch(results)
+            grand_total += len(results)
+            grand_saved += saved
+            print(f"  Saved {saved} to database ({time.time() - t0:.0f}s)")
 
             time.sleep(1)
 

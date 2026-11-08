@@ -21,11 +21,7 @@ class MestoScraper(BaseScraper):
             match = re.search(r"url=([^&]+)", src)
             if match:
                 return unquote(match.group(1))
-        if src.startswith("//"):
-            return "https:" + src
-        if src.startswith("/"):
-            return self.base_url + src
-        return src
+        return self.absolute_url(src)
 
     def _parse_listing_card(self, anchor):
         href = anchor.get("href", "")
@@ -98,11 +94,34 @@ class MestoScraper(BaseScraper):
             "location": location_str,
             "area": area,
             "features": features_arr,
-            "link": self.base_url + href,
+            "link": self.absolute_url(href),
             "image": img_src,
             "price_unit": self.detect_price_unit(price_raw),
             "leto_izgradnje": year_built,
         }
+
+    def parse_page(self, soup):
+        """Pretvori eno stran seznama v seznam oglasov (brez omrežja)."""
+        grid = soup.find(class_=re.compile(r"\blistings-grid\b"))
+        if not grid:
+            return []
+
+        anchors = [
+            anchor
+            for anchor in grid.find_all("a", href=True)
+            if anchor["href"].startswith("/nepremicnina/")
+        ]
+
+        listings = []
+        for anchor in anchors:
+            try:
+                item = self._parse_listing_card(anchor)
+            except Exception as item_error:
+                print(f"[{self.name}] Napaka pri branju posameznega oglasa: {item_error}")
+                continue
+            if item and item.get("link"):
+                listings.append(item)
+        return listings
 
     def scrape(self, buy=True, **kwargs):
         """
@@ -130,34 +149,20 @@ class MestoScraper(BaseScraper):
                 if not soup:
                     break
 
-                grid = soup.find(class_=re.compile(r"\blistings-grid\b"))
-                if not grid:
-                    break
-
-                anchors = [
-                    a
-                    for a in grid.find_all("a", href=True)
-                    if a["href"].startswith("/nepremicnina/")
-                ]
-                if not anchors:
+                page_listings = self.parse_page(soup)
+                if not page_listings:
                     break
 
                 trenutna_stran_stevec = 0
+                known_links = {o["link"] for o in vsi_oglasi}
 
-                for anchor in anchors:
-                    try:
-                        item = self._parse_listing_card(anchor)
-                        if item and item.get("link"):
-                            # Preprečevanje duplikatov
-                            if any(o["link"] == item["link"] for o in vsi_oglasi):
-                                continue
-                            vsi_oglasi.append(item)
-                            trenutna_stran_stevec += 1
-                    except Exception as item_error:
-                        print(
-                            f"[{self.name}] Napaka pri branju posameznega oglasa: {item_error}"
-                        )
+                for item in page_listings:
+                    # Preprečevanje duplikatov med stranmi
+                    if item["link"] in known_links:
                         continue
+                    known_links.add(item["link"])
+                    vsi_oglasi.append(item)
+                    trenutna_stran_stevec += 1
 
                 if trenutna_stran_stevec == 0:
                     break

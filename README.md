@@ -54,10 +54,22 @@ NepremicnineApp/
 │   ├── run_scraper.py               # enkratni polni zagon (pisanje prek REST API)
 │   ├── normalize_locations.py       # čiščenje/enotno poimenovanje lokacij (dry-run privzeto)
 │   ├── requirements.txt
+│   ├── requirements-dev.txt         # pytest
+│   ├── pytest.ini                   # privzeto brez mrežnih testov
+│   ├── tests/                       # pytest: normalizatorji, modeli, parserji, register
+│   │   ├── fixtures/                # shranjene HTML strani (brez živih klicev)
+│   │   ├── test_normalizers.py
+│   │   ├── test_models.py
+│   │   ├── test_base_scraper.py
+│   │   ├── test_registry.py
+│   │   └── test_sources.py
 │   ├── test_fast.py                 # hitri contract testi (mreža)
 │   ├── test_scrapers.py             # polni contract testi vseh scraperjev (mreža)
 │   └── scrapers/
-│       ├── base_scraper.py          # fetch, clean_price, clean_area, absolute_url
+│       ├── base_scraper.py          # osnova: timeout, retry/backoff, throttle, ScrapeResult
+│       ├── models.py                # SearchQuery, Listing, ScrapeResult
+│       ├── normalizers.py           # cene, površine, URL, status, tip
+│       ├── registry.py              # seznam virov (kaj se poganja in kaj ne)
 │       ├── galea.py                 # galea.si
 │       ├── si21.py                  # nepremicnine.si21.com
 │       ├── siol.py                  # nepremicnine.siol.net
@@ -234,11 +246,14 @@ Pravila za nove scraperje: glej [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
 cd backend
+pip install -r requirements-dev.txt
+python -m pytest          # 92 testov, brez omrežja (fixtures)
+python -m pytest -m network   # mrežni testi, če so označeni
 python test_fast.py       # hitri testi (INSA, Simobilia, SolTerra, ABC, Ljubljana + DB)
 python test_scrapers.py   # polni contract testi vseh scraperjev + DB
 ```
 
-Testi dostopajo do živih spletnih strani in baze, zato so počasni in odvisni od dosegljivosti virov. Frontend:
+`pytest` suite ne dostopa do interneta: parserje preverja na shranjenih straneh v `tests/fixtures/`, zato teče v CI in ob vsaki spremembi. `test_fast.py` in `test_scrapers.py` dostopata do živih strani in baze, zato sta počasna in odvisna od dosegljivosti virov. Frontend:
 
 ```bash
 cd frontend/nepremicnine-portal

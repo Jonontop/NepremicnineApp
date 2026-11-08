@@ -1,0 +1,2 @@
+# Razvojne odvisnosti (produkcijske so v requirements.txt)
+pytest>=8.0
