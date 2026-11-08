@@ -13,15 +13,24 @@ import schedule  # Knjižnica za časovnike
 from scrapers.abcnepremicnine import AbcScraper
 from scrapers.galea import GaleaScraper
 from scrapers.si21 import Si21Scraper
+from scrapers.mestonepremicnin import MestoScraper
 from scrapers.siol import SiolScraper
 from scrapers.ljubljanaNepremicnine import LjubljanaScraper
+from scrapers.insa import InsaScraper
+from scrapers.simobilia import SimobiliaScraper
+from scrapers.solterra import SolTerraScraper
 
 # Naloži okoljske spremenljivke
 load_dotenv()
 DB_URI = os.getenv("SUPABASE_DB_URI")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 if not DB_URI:
-    raise ValueError("[X] Napaka: SUPABASE_DB_URI ni nastavljen v .env datoteki!")
+    print("[!] Opozorilo: SUPABASE_DB_URI ni nastavljen. Uporabljam REST API fallback.")
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    if not DB_URI:
+        raise ValueError("[X] Napaka: Potrebujete SUPABASE_DB_URI ali SUPABASE_URL + SUPABASE_SERVICE_KEY!")
 
 def clean_status(raw_status):
     if not raw_status:
@@ -34,6 +43,9 @@ def clean_status(raw_status):
     return "drugo"
 
 def dnevno_ciscenje_podvojenih_slik():
+    if not DB_URI:
+        print("\n[!] Preskakujem čiščenje podvojenih slik: SUPABASE_DB_URI ni nastavljen.")
+        return
     print("\n[+] Začenjam dnevno čiščenje podvojenih slik...")
     delete_query = """
         WITH podvojene_slike AS (
@@ -60,6 +72,9 @@ def dnevno_ciscenje_podvojenih_slik():
         print(f"[X] Napaka pri čiščenju podvojenih slik: {e}")
 
 def popravi_manjkajoce_podatke():
+    if not DB_URI:
+        print("\n[!] Preskakujem popravilo manjkajočih podatkov: SUPABASE_DB_URI ni nastavljen.")
+        return
     print("\n=========================================")
     print(" 🛠️  ZAGON POPRAVILA MANJKANOČIH PODATKOV ")
     print("=========================================")
@@ -86,7 +101,8 @@ def popravi_manjkajoce_podatke():
             "si21": Si21Scraper(),
             "siol": SiolScraper(),
             "ljubljana": LjubljanaScraper(),
-            "abc": AbcScraper()
+            "abc": AbcScraper(),
+            "mestonepremicnin": MestoScraper()
         }
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
@@ -115,7 +131,8 @@ def popravi_manjkajoce_podatke():
                     price_meta = soup.find("meta", property="og:price:amount")
                     img_meta = soup.find("meta", property="og:image")
                     if price_meta:
-                        repaired_data["price"] = int(''.join(filter(str.isdigit, price_meta["content"])))
+                        import re as _re
+                        repaired_data["price"] = int(_re.sub(r'[^0-9]', '', price_meta["content"]))
                     if img_meta and img_meta["content"]:
                         repaired_data["image"] = img_meta["content"]
 
@@ -163,6 +180,61 @@ def send_admin_email(subject, body):
     except Exception as e:
         print(f"[X] Napaka pri pošiljanju poročila administratorju: {e}")
 
+def save_to_database_rest(valid_listings):
+    """Shrani oglase v Supabase preko REST API (PostgREST)."""
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        print("[X] REST API: Manjka SUPABASE_URL ali SUPABASE_SERVICE_KEY.")
+        return
+
+    url = f"{SUPABASE_URL}/rest/v1/nepremicnine_oglasi"
+    headers = {
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates",
+    }
+
+    # Pripravi podatke za REST API (PostgREST uporablja JSON)
+    rows = []
+    for item in valid_listings:
+        row = {
+            "site": item["site"],
+            "status": clean_status(item["status"]),
+            "type": item["type"],
+            "price": item["price"],
+            "price_unit": item.get("price_unit", "total"),
+            "location": item["location"],
+            "area": item["area"],
+            "features": item["features"],
+            "link": item["link"],
+            "image": item["image"],
+            "novogradnja": item.get("novogradnja", False),
+            "leto_izgradnje": item.get("leto_izgradnje"),
+        }
+        rows.append(row)
+
+    # Pošlji v batchih po 100 (PostgREST ima limits)
+    batch_size = 100
+    total_saved = 0
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i:i + batch_size]
+        try:
+            resp = requests.post(
+                url,
+                headers=headers,
+                json=batch,
+                params={"on_conflict": "link"},
+                timeout=30,
+            )
+            if resp.status_code in (200, 201):
+                total_saved += len(batch)
+            else:
+                print(f"[X] REST API napaka ({resp.status_code}): {resp.text[:200]}")
+        except Exception as e:
+            print(f"[X] REST API izjema: {e}")
+
+    print(f"[✓] REST API: Shranjenih {total_saved}/{len(rows)} oglasov.")
+
 def save_to_database(listings):
     if not listings:
         print("\n[!] Ni novih oglasov za vpis v bazo.")
@@ -175,12 +247,14 @@ def save_to_database(listings):
         link = item.get('link')
         site = item.get('site')
         
-        if not price or price <= 0 or not location or location == "N/A" or not location.strip():
+        if not price or price <= 0 or not location or location == "N/A" or not location.strip() or not link or not link.strip():
             reason = []
             if not price or price <= 0:
                 reason.append("cena je n/a ali 0")
             if not location or location == "N/A" or not location.strip():
                 reason.append("kraj je n/a")
+            if not link or not link.strip():
+                reason.append("povezava je prazna")
             
             reason_str = ", ".join(reason)
             subject = f"Neveljaven oglas izločen: {site}"
@@ -229,17 +303,26 @@ def save_to_database(listings):
         )
         for item in valid_listings
     ]
-    try:
-        print(f"\n[↑] Povezujem se s Supabase in osvežujem {len(data_to_insert)} oglasov...")
-        conn = psycopg2.connect(DB_URI)
-        cur = conn.cursor()
-        execute_values(cur, query, data_to_insert, template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())")
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("[✓] Podatki uspešno shranjeni/posodobljeni! (Baza je avtomatsko preverila zgodovino cen via Trigger)")
-    except Exception as e:
-        print(f"[X] Napaka pri vpisu v bazo podatkov: {e}")
+    # Poskus 1: Neposredna PostgreSQL povezava
+    if DB_URI:
+        try:
+            print(f"\n[↑] Povezujem se s Supabase (PostgreSQL) in osvežujem {len(data_to_insert)} oglasov...")
+            conn = psycopg2.connect(DB_URI)
+            cur = conn.cursor()
+            execute_values(cur, query, data_to_insert, template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())")
+            conn.commit()
+            cur.close()
+            conn.close()
+            print("[✓] Podatki uspešno shranjeni/posodobljeni! (PostgreSQL)")
+            return
+        except Exception as e:
+            print(f"[!] PostgreSQL napaka ({e}), preklopim na REST API...")
+
+    # Poskus 2: Supabase REST API (PostgREST)
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        save_to_database_rest(valid_listings)
+    else:
+        print("[X] Noben način pisanja v bazo ni na voljo.")
 
 # --- GLAVNA FUNKCIJA ZA ZAGON CELOTNEGA CIKLA ---
 def celoten_zagon_strganja():
@@ -249,7 +332,12 @@ def celoten_zagon_strganja():
         GaleaScraper(),
         Si21Scraper(),
         SiolScraper(),
-        LjubljanaScraper()
+        LjubljanaScraper(),
+        MestoScraper(),
+        AbcScraper(),
+        InsaScraper(),
+        SimobiliaScraper(),
+        SolTerraScraper(),
     ]
     all_listings = []
 
@@ -258,12 +346,7 @@ def celoten_zagon_strganja():
         for scraper in scrapers:
             print(f"\n[+] Poganjam vir: {scraper.name.upper()} ({buy_str})")
             try:
-                # Popolnoma avtomatizirana BULK scraperja brez omejitev parametrov
-                if scraper.name in ["galea", "si21-nepremicnine"]:
-                    results = scraper.scrape(buy=buy)
-                else:
-                    results = scraper.scrape(limit=150, buy=buy, property_type="flat")
-                    
+                results = scraper.scrape(buy=buy)
                 for item in results:
                     all_listings.append(item)
                 print(f"[✓] {scraper.name} vrnil {len(results)} oglasov za obdelavo.")

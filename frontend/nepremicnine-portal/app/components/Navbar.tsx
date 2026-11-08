@@ -11,14 +11,9 @@ import { useLanguage } from '../LanguageContext';
 export default function Navbar() {
   const router = useRouter();
   const { language, setLanguage } = useLanguage();
-  const [mounted, setMounted] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -127,6 +122,8 @@ export default function Navbar() {
           <Link href="/faq" className="hover:text-amber-400 transition-colors">
             {t.faq}
           </Link>
+
+
         </nav>
 
         {/* Right side: theme toggle + language button + mobile hamburger */}
@@ -137,7 +134,7 @@ export default function Navbar() {
             onClick={toggleLanguage}
             className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-amber-400 dark:hover:bg-amber-300 dark:text-slate-950 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm cursor-pointer"
           >
-            {mounted ? t.langLabel : 'English'}
+            {t.langLabel}
           </button>
 
           {/* Mobilni Hamburger menu */}
@@ -172,6 +169,7 @@ export default function Navbar() {
           <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.home}</Link>
           <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.about}</Link>
           <Link href="/faq" onClick={() => setMobileMenuOpen(false)} className="text-left py-1">{t.faq}</Link>
+
         </div>
       )}
     </header>

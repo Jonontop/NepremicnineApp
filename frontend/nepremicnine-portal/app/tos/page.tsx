@@ -26,7 +26,7 @@ export default function TermsOfService() {
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">1. Splošne določbe in opis storitve</h2>
             <p className="text-sm leading-relaxed mb-2">
-              Spletno mesto <strong>Vesta.si</strong> (v nadaljevanju: "Portal") deluje izključno kot tehnološki ponudnik in informacijski agregator nepremičninskih oglasov v Sloveniji. Uporabnikom omogočamo iskanje, pregled in primerjavo javno dostopnih podatkov na enem mestu.
+              Spletno mesto <strong>Vesta.si</strong> (v nadaljevanju: &quot;Portal&quot;) deluje izključno kot tehnološki ponudnik in informacijski agregator nepremičninskih oglasov v Sloveniji. Uporabnikom omogočamo iskanje, pregled in primerjavo javno dostopnih podatkov na enem mestu.
             </p>
             <p className="text-sm leading-relaxed">
               Z uporabo tega Portala uporabnik potrjuje, da je seznanjen s temi Splošnimi pogoji, se z njimi strinja in jih v celoti sprejema.

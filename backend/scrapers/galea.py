@@ -58,7 +58,7 @@ class GaleaScraper(BaseScraper):
                             if not link:
                                 continue
                                 
-                            celoten_link = self.base_url + link
+                            celoten_link = self.absolute_url(link)
 
                             if any(o['link'] == celoten_link for o in vsi_oglasi):
                                 continue

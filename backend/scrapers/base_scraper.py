@@ -33,6 +33,24 @@ class BaseScraper:
             print(f"[{self.name}] Napaka pri prenosu URL {url}: {e}")
             return None
 
+    def absolute_url(self, href):
+        """Pretvori povezavo iz oglasa v absolutni URL.
+
+        Absolutne povezave pustimo pri miru (prej so se podvojile v
+        "https://portal/https://portal/..."), protocol-relative dopolnimo,
+        relativne pa pripnemo na base_url.
+        """
+        if not href:
+            return ""
+        href = str(href).strip()
+        if href.startswith("http://") or href.startswith("https://"):
+            return href
+        if href.startswith("//"):
+            return "https:" + href
+        if not href.startswith("/"):
+            href = "/" + href
+        return self.base_url + href
+
     def clean_price(self, price_text):
         """ Pretvori tekstualno ceno v celo število in pravilno reši razpone (npr. 547.522 - 591.067 €) """
         if not price_text or price_text == "N/A":
@@ -50,6 +68,11 @@ class BaseScraper:
                 price_str = price_str.split(separator)[0].strip()
                 break # Uspešno smo zgrabili začetno ceno, gremo naprej na čiščenje
 
+        # Odstrani enoto cene na m2 (npr. '/m²', '/m2', '€/m2')
+        # da ne pobere '2' iz 'm2' kot del cene
+        import re
+        price_str = re.sub(r'/m[²2]', '', price_str)
+
         # Popravek za decimalne cente (če obstajajo za vejico)
         if ',' in price_str:
             parts = price_str.split(',')
@@ -57,7 +80,9 @@ class BaseScraper:
                 price_str = parts[0]
 
         # Sedaj varno poberemo številke samo iz PRVEGA dela cene
-        numeric_price = ''.join(filter(str.isdigit, price_str))
+        # Uporabimo regex namesto str.isdigit(), ker Python 3
+        # treatsa Unicode številke (npr. ²) kot.isdigit()==True
+        numeric_price = re.sub(r'[^0-9]', '', price_str)
         cena = int(numeric_price) if numeric_price else 0
         
         # Končna varovalka za ekstremne sistemske napake

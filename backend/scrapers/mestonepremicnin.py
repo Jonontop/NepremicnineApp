@@ -1,4 +1,6 @@
 import re
+import time
+import random
 from urllib.parse import unquote
 
 from scrapers.base_scraper import BaseScraper
@@ -102,68 +104,74 @@ class MestoScraper(BaseScraper):
             "leto_izgradnje": year_built,
         }
 
-    def scrape(self, limit=5, buy=True, property_type="flat", **kwargs):
+    def scrape(self, buy=True, **kwargs):
+        """
+        Popoln BULK zagon za MestoNepremicnine. Prebrska vse tipe
+        nepremičnin in gre skozi celotno paginacijo (?page=X).
+        """
         types_map = {
             "flat": "stanovanje",
             "house": "hisa",
             "business": "poslovni-prostor",
             "land": "parcela",
+            "garage": "garazaparkirno-mesto",
         }
-
         action = "prodaja" if buy else "oddaja"
-        type_slug = types_map.get(property_type)
+        vsi_oglasi = []
 
-        base_path = f"{self.base_url}/sl/nepremicnine/{action}"
-        if type_slug:
-            base_path += f"/{type_slug}"
+        for prop_type, type_slug in types_map.items():
+            page = 1
+            base_path = f"{self.base_url}/sl/nepremicnine/{action}/{type_slug}"
+            print(f"  [→] MestoNepremicnine: Strgam kategorijo: {prop_type} ({action})")
 
-        data = []
-        page = 1
-
-        while len(data) < limit:
-            url = base_path if page == 1 else f"{base_path}?page={page}"
-            soup = self._get_soup(url)
-            if not soup:
-                break
-
-            grid = soup.find(class_=re.compile(r"\blistings-grid\b"))
-            if not grid:
-                break
-
-            anchors = [
-                a
-                for a in grid.find_all("a", href=True)
-                if a["href"].startswith("/nepremicnina/")
-            ]
-            if not anchors:
-                break
-
-            page_count = 0
-            for anchor in anchors:
-                if len(data) >= limit:
+            while True:
+                url = base_path if page == 1 else f"{base_path}?page={page}"
+                soup = self._get_soup(url)
+                if not soup:
                     break
-                try:
-                    item = self._parse_listing_card(anchor)
-                    if item:
-                        data.append(item)
-                        page_count += 1
-                except Exception as item_error:
-                    print(
-                        f"[{self.name}] Napaka pri branju posameznega oglasa: {item_error}"
-                    )
-                    continue
 
-            if page_count == 0:
-                break
+                grid = soup.find(class_=re.compile(r"\blistings-grid\b"))
+                if not grid:
+                    break
 
-            page += 1
+                anchors = [
+                    a
+                    for a in grid.find_all("a", href=True)
+                    if a["href"].startswith("/nepremicnina/")
+                ]
+                if not anchors:
+                    break
 
-        return data
+                trenutna_stran_stevec = 0
+
+                for anchor in anchors:
+                    try:
+                        item = self._parse_listing_card(anchor)
+                        if item and item.get("link"):
+                            # Preprečevanje duplikatov
+                            if any(o["link"] == item["link"] for o in vsi_oglasi):
+                                continue
+                            vsi_oglasi.append(item)
+                            trenutna_stran_stevec += 1
+                    except Exception as item_error:
+                        print(
+                            f"[{self.name}] Napaka pri branju posameznega oglasa: {item_error}"
+                        )
+                        continue
+
+                if trenutna_stran_stevec == 0:
+                    break
+
+                print(f"    [Strana {page}] Nabranih {trenutna_stran_stevec} oglasov.")
+                page += 1
+                time.sleep(random.uniform(0.5, 1.5))
+
+        return vsi_oglasi
 
 
 if __name__ == "__main__":
     import json
 
     scraper = MestoScraper()
-    results = scraper.scrape(limit=5)
+    results = scraper.scrape(buy=True)
     print(json.dumps(results, indent=4, ensure_ascii=False))

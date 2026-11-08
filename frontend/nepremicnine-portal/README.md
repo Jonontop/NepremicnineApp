@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# nepremicnine-portal — Next.js frontend (vesta.si)
 
-## Getting Started
+Next.js 16 (App Router) + TypeScript + Tailwind CSS 4. Aplikacija bere oglase iz Supabase prek lastnih API route-ov in jih prikaže v dvojezičnem (SL/EN) vmesniku s svetlo/temno temo.
 
-First, run the development server:
+## Zagon
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+cp .env.example .env.local     # NEXT_PUBLIC_SUPABASE_URL + publishable ali anon ključ
+npm run dev                    # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Brez nastavljenih ključev aplikacija dela, vendar prikaže prazna stanja (API vrne prazne rezultate).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Ukazi
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Ukaz | Namen |
+|------|-------|
+| `npm run dev` | razvojni strežnik (Turbopack) |
+| `npm run build` | produkcijska gradnja |
+| `npm start` | zagon zgrajene aplikacije |
+| `npm run lint` | ESLint (brez opozoril) |
+| `npm run preview` | OpenNext build + lokalni Cloudflare preview |
+| `npm run deploy` | OpenNext build + deploy na Cloudflare |
 
-## Learn More
+## Struktura
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/
+├── layout.tsx              # metadata, Manrope, ThemeProvider, LanguageProvider, Navbar, Footer
+├── page.tsx                # domov
+├── search/page.tsx         # iskalnik (filtri, pager, modal)
+├── about|faq|tos|privacy/  # vsebinske strani
+├── admin/page.tsx          # nadzorna plošča (javna — glej opozorilo)
+├── dashboard/page.tsx      # ista vsebina kot /admin
+├── LanguageContext.tsx     # SL/EN prek useSyncExternalStore + localStorage
+├── ThemeProvider.tsx       # dark/light prek useSyncExternalStore + localStorage
+└── api/
+    ├── properties/route.ts       # GET oglasi: raw | home | stats
+    └── scraper-health/route.ts   # GET statistika virov
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`GET /api/properties?limit=50&offset=0&orderBy=weight_desc&view=raw`
 
-## Deploy on Vercel
+- `limit` 1–1000, `offset` za paging (PostgREST omejitev 1000 vrstic),
+- `view`: `raw` (surove vrstice), `home` (oblika za domov, vključno z `link` in `site`), `stats` (agregati celotne tabele).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`GET /api/scraper-health` — skupni števci, statistika po viru in kakovost podatkov.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tema in jezik
+
+Oba providerja uporabljata `useSyncExternalStore`: strežnik vedno uporabi privzeto vrednost (`sl`, `light`), odjemalec po hidraciji prebere `localStorage`. Inline skript v `layout.tsx` nastavi `dark` razred pred hidracijo, da ni utripanja.
+
+## Deploy
+
+```bash
+npm run deploy   # OpenNext + Cloudflare Workers (wrangler.jsonc)
+```
+
+`wrangler.jsonc` vsebuje samo javne `NEXT_PUBLIC_*` vrednosti. Service-role ključ ne sme priti v frontend.
+
+## Opozorila
+
+- `/admin` in `/dashboard` nista zaščitena — ne objavljajta ju, dokler ni dodane avtentikacije.
+- Iskanje filtrira na odjemalcu in naloži do 10.000 vrstic; ob rasti baze je treba filtre prenesti v SQL.

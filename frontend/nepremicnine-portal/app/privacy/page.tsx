@@ -26,7 +26,7 @@ export default function PrivacyPolicy() {
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">1. Splošne informacije</h2>
             <p className="text-sm leading-relaxed">
-              Upravljavec spletnega mesta <strong>Vesta.si</strong> (v nadaljevanju: "Portal") spoštuje vašo zasebnost in se zavezuje k varovanju osebnih podatkov v skladu s slovensko zakonodajo (ZVOP-2) and Splošno uredbo EU o varstvu podatkov (GDPR). Ta pravilnik pojasnjuje, kako Portal ravna s podatki med vašim obiskom.
+              Upravljavec spletnega mesta <strong>Vesta.si</strong> (v nadaljevanju: &quot;Portal&quot;) spoštuje vašo zasebnost in se zavezuje k varovanju osebnih podatkov v skladu s slovensko zakonodajo (ZVOP-2) and Splošno uredbo EU o varstvu podatkov (GDPR). Ta pravilnik pojasnjuje, kako Portal ravna s podatki med vašim obiskom.
             </p>
           </div>
 

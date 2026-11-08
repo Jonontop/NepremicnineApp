@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { useLanguage } from '../LanguageContext';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -17,7 +16,6 @@ import {
   faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
 
-import { useTheme } from '../ThemeProvider';
 
 // ── TYPES ────────────────────────────────────────────────────────────────────
 interface Listing {
@@ -34,6 +32,7 @@ interface Listing {
   features?: string[];
   posodobljeno_ob?: string;
   weight?: number;
+  novogradnja?: boolean;
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -72,6 +71,23 @@ function mapTypeGroup(rawType: string | null | undefined): string {
   if (t.includes('poslov') || t.includes('office')) return 'poslovni';
   if (t.includes('zem') || t.includes('parcela') || t.includes('land')) return 'zemljisce';
   return 'stanovanje';
+}
+
+function roomsFromArea(area: number | null | undefined): number {
+  const a = Number(area) || 0;
+  if (a >= 120) return 5;
+  if (a >= 90) return 4;
+  if (a >= 60) return 3;
+  if (a >= 35) return 2;
+  return 1;
+}
+
+function roomsForListing(listing: Listing): number {
+  const text = (listing.type || '').toLowerCase();
+  if (text.includes('garsonjera') || text.includes('studio')) return 1;
+  const match = text.match(/(\d+)[- ]?sob/);
+  if (match) return Math.min(parseInt(match[1], 10), 5);
+  return roomsFromArea(listing.area);
 }
 
 function isValidListing(l: Listing): boolean {
@@ -130,6 +146,8 @@ const searchTranslations = {
     weekend: 'Vikend',
     locationLabel: 'Kraj',
     allLocations: 'Vse lokacije',
+    roomsLabel: 'Število sob',
+    anyRooms: 'Vse',
     sortLabel: 'Razvrstitev',
     recommended: 'Priporočeno',
     newest: 'Najnovejši',
@@ -155,6 +173,7 @@ const searchTranslations = {
     etnAvg: 'Zgodovinsko povprečje ETN:',
     marketDev: 'Tržno odstopanje:',
     overpriced: 'Precenjeno',
+    underpriced: 'Podcenjeno',
     etnRef: 'Referenčna vrednost (ETN):',
     gursTax: 'Ocenjen GURS davčni temelj:',
     noEtnData: 'Ni zadostnih podatkov o kvadraturi ali ceni za preračun ETN mikrolokacije.',
@@ -185,6 +204,8 @@ const searchTranslations = {
     weekend: 'Weekend House',
     locationLabel: 'City',
     allLocations: 'All locations',
+    roomsLabel: 'Rooms',
+    anyRooms: 'Any',
     sortLabel: 'Sort by',
     recommended: 'Recommended',
     newest: 'Newest',
@@ -210,6 +231,7 @@ const searchTranslations = {
     etnAvg: 'Historical ETN average:',
     marketDev: 'Market deviation:',
     overpriced: 'Overpriced',
+    underpriced: 'Underpriced',
     etnRef: 'Reference value (ETN):',
     gursTax: 'Estimated GURS tax base:',
     noEtnData: 'Insufficient area or price data to compute ETN micro-location.',
@@ -234,8 +256,6 @@ function PriceRangeSlider({
   onChange: (min: number | null, max: number | null) => void;
   lang: 'sl' | 'en';
 }) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
   const st = searchTranslations[lang];
 
   // Dinamični korak glede na velikost najvišje cene
@@ -306,7 +326,6 @@ const PAGE_SIZE = 30;
 // ── MAIN CONTENT COMPONENT ─────────────────────────────────────────────────
 function SearchContent() {
   const searchParams = useSearchParams();
-  const { theme } = useTheme();
   const { language } = useLanguage();
   const st = searchTranslations[language];
 
@@ -326,16 +345,30 @@ function SearchContent() {
     minPrice: initialMinPrice,
     maxPrice: initialMaxPrice,
     sortBy: 'weight_desc',
+    rooms: searchParams.get('rooms') || '',
+    onlyNewbuilds: searchParams.get('filter') === 'novogradnje',
   });
 
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
       try {
-        const response = await fetch('/api/properties?limit=1000&orderBy=weight_desc');
-        if (!response.ok) throw new Error('Napaka pri pridobivanju oglasov');
-        const data = await response.json();
-        setListings((data as Listing[]) || []);
+        // The API (and PostgREST) cap one response at 1000 rows, so walk the
+        // table in pages until the dataset is exhausted.
+        const pageSize = 1000;
+        const maxRows = 10000;
+        const collected: Listing[] = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const response = await fetch(
+            `/api/properties?limit=${pageSize}&offset=${offset}&orderBy=weight_desc`
+          );
+          if (!response.ok) throw new Error('Napaka pri pridobivanju oglasov');
+          const page = (await response.json()) as Listing[];
+          if (!Array.isArray(page) || page.length === 0) break;
+          collected.push(...page);
+          if (page.length < pageSize || collected.length >= maxRows) break;
+        }
+        setListings(collected);
       } catch (err) {
         console.error('Napaka pri pridobivanju oglasov:', err);
       }
@@ -377,6 +410,11 @@ function SearchContent() {
     }
     if (filters.minPrice !== null) temp = temp.filter((l) => { const comparablePrice = getComparablePrice(l); return comparablePrice !== null && comparablePrice >= filters.minPrice!; });
     if (filters.maxPrice !== null) temp = temp.filter((l) => { const comparablePrice = getComparablePrice(l); return comparablePrice !== null && comparablePrice <= filters.maxPrice!; });
+    if (filters.rooms !== '') {
+      const wanted = Number(filters.rooms);
+      temp = temp.filter((l) => (wanted >= 5 ? roomsForListing(l) >= 5 : roomsForListing(l) === wanted));
+    }
+    if (filters.onlyNewbuilds) temp = temp.filter((l) => l.novogradnja === true || (l.features || []).some((f) => f.toLowerCase().includes('novo')));
 
     temp.sort((a, b) => {
       if (filters.sortBy === 'weight_desc') {
@@ -399,15 +437,40 @@ function SearchContent() {
   const handleFilterChange = (name: string, value: string | number | null) => { setCurrentPage(1); setFilters((prev) => ({ ...prev, [name]: value })); };
 
   // ── DETALJNI ETN IZRAČUN ──────────────────────
+  // Compute a zone average from comparable listings (same type, similar area range)
+  // to give a meaningful price/m² comparison instead of hardcoded placeholder.
   const etnData = useMemo(() => {
     if (!selectedListing || !selectedListing.price || !selectedListing.area || selectedListing.area <= 0) return null;
     
     const currentM2 = getPriceUnit(selectedListing) === 'per_m2' 
       ? Number(selectedListing.price)
       : Math.round(Number(selectedListing.price) / Number(selectedListing.area));
+
+    // Find comparable listings: same property type group, area within ±40%
+    const selectedGroup = mapTypeGroup(selectedListing.type);
+    const selectedArea = Number(selectedListing.area);
+    const comparablePrices: number[] = [];
+    
+    for (const l of listings) {
+      if (!l.price || l.price <= 0 || !l.area || l.area <= 0) continue;
+      if (l.id === selectedListing.id) continue;
+      if (mapTypeGroup(l.type) !== selectedGroup) continue;
       
-    const etnZoneAverage = Math.round(currentM2 * 0.93);
-    const deviation = (((currentM2 - etnZoneAverage) / etnZoneAverage) * 100).toFixed(1);
+      const area = Number(l.area);
+      // Area within ±40% of the selected listing
+      if (area < selectedArea * 0.6 || area > selectedArea * 1.4) continue;
+      
+      const priceM2 = getPriceUnit(l) === 'per_m2'
+        ? Number(l.price)
+        : Math.round(Number(l.price) / area);
+      if (priceM2 > 0) comparablePrices.push(priceM2);
+    }
+
+    // Need at least 5 comparable listings for a meaningful average
+    if (comparablePrices.length < 5) return null;
+
+    const etnZoneAverage = Math.round(comparablePrices.reduce((a, b) => a + b, 0) / comparablePrices.length);
+    const deviation = etnZoneAverage > 0 ? (((currentM2 - etnZoneAverage) / etnZoneAverage) * 100).toFixed(1) : '0.0';
     
     const totalArea = Number(selectedListing.area);
     const etnEstimatedTotal = etnZoneAverage * totalArea;
@@ -419,7 +482,7 @@ function SearchContent() {
       etnEstimatedTotal, 
       gursTaxBaseEstimate 
     };
-  }, [selectedListing]);
+  }, [selectedListing, listings]);
 
   if (loading) {
     return (
@@ -515,6 +578,22 @@ function SearchContent() {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <FontAwesomeIcon icon={faBuilding} className="text-[10px]" /> {st.roomsLabel}
+              </label>
+              <select
+                value={filters.rooms}
+                onChange={(e) => handleFilterChange('rooms', e.target.value)}
+                className="w-full border text-sm font-medium rounded-xl p-3 outline-none focus:border-amber-400 appearance-none cursor-pointer bg-slate-50 border-slate-300 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              >
+                <option value="">{st.anyRooms}</option>
+                {[1, 2, 3, 4, 5].map((num) => (
+                  <option key={num} value={String(num)}>{num === 5 ? '5+' : num}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <FontAwesomeIcon icon={faSortAmountDown} className="text-[10px]" /> {st.sortLabel}
               </label>
               <select 
@@ -558,7 +637,7 @@ function SearchContent() {
             {filteredListings.length === 0 ? (
               <div className="text-center py-20 border border-dashed rounded-2xl border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400">
                 <p className="text-base font-medium mb-3">{st.noResults}</p>
-                <button onClick={() => setFilters({ action: 'vse', type: 'vse', location: '', minPrice: null, maxPrice: null, sortBy: 'weight_desc' })} className="text-sm text-amber-500 underline cursor-pointer">{st.resetFilters}</button>
+                <button onClick={() => setFilters({ action: 'vse', type: 'vse', location: '', minPrice: null, maxPrice: null, sortBy: 'weight_desc', rooms: '', onlyNewbuilds: false })} className="text-sm text-amber-500 underline cursor-pointer">{st.resetFilters}</button>
               </div>
             ) : (
               <>
@@ -766,8 +845,8 @@ function SearchContent() {
                         </div>
                         <div>
                           <span className="text-slate-400 dark:text-slate-500 block mb-0.5">{st.marketDev}</span>
-                          <span className="font-bold text-sm sm:text-base text-amber-600 dark:text-amber-400">
-                            +{etnData.deviation}% ({st.overpriced})
+                          <span className={`font-bold text-sm sm:text-base ${Number(etnData.deviation) >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {Number(etnData.deviation) >= 0 ? '+' : ''}{etnData.deviation}% ({Number(etnData.deviation) >= 0 ? st.overpriced : st.underpriced})
                           </span>
                         </div>
                       </div>

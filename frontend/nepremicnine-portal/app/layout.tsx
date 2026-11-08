@@ -1,14 +1,7 @@
 import Script from 'next/script';
 import './globals.css';
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Manrope } from 'next/font/google';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faDatabase, 
-  faCodeBranch, 
-  faEnvelope 
-} from '@fortawesome/free-solid-svg-icons';
 import { ThemeProvider } from './ThemeProvider';
 import { LanguageProvider } from './LanguageContext';
 import Navbar from './components/Navbar';

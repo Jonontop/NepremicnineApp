@@ -38,6 +38,8 @@ type HomeProperty = {
   filterTag: "novogradnje" | "24h" | "premium" | "rabljeno";
   type: "stanovanje" | "hisa" | "poslovni" | "vikend";
   weight: number;
+  link: string | null;
+  site: string | null;
 };
 
 const SUPPORTED_CITIES: HomeProperty["city"][] = [
@@ -50,6 +52,29 @@ const SUPPORTED_CITIES: HomeProperty["city"][] = [
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1560185007-5f0bb1866cab?auto=format&fit=crop&w=1200&q=80";
+
+// PostgREST caps a single response at 1000 rows, so full-table statistics must
+// page through the data in chunks instead of relying on one query.
+const ROW_PAGE_SIZE = 1000;
+
+type RowPage<T> = {
+  data: T[] | null;
+  error: { message: string } | null;
+};
+
+async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<RowPage<T>>
+): Promise<{ rows: T[]; error: string | null }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += ROW_PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + ROW_PAGE_SIZE - 1);
+    if (error) return { rows, error: error.message };
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < ROW_PAGE_SIZE) break;
+  }
+  return { rows, error: null };
+}
 
 function isValidListing(row: RawListing): boolean {
   if (!row.price || row.price <= 0) return false;
@@ -198,6 +223,8 @@ function mapHomeProperty(row: RawListing): HomeProperty {
     filterTag,
     type,
     weight,
+    link: row.link,
+    site: row.site,
   };
 }
 
@@ -205,6 +232,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limitParam = Number(searchParams.get("limit") || "50");
+    const offsetParam = Number(searchParams.get("offset") || "0");
     const orderBy = searchParams.get("orderBy") || "posodobljeno_ob_desc";
     const view = searchParams.get("view") || "raw";
 
@@ -214,13 +242,23 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!url || !key) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY).",
-        },
-        { status: 500 }
-      );
+      // Return empty data gracefully instead of crashing when credentials are missing.
+      // The frontend already handles empty states (loading spinners, "no results" messages).
+      if (view === "stats") {
+        return NextResponse.json({
+          activeAdsCount: 0,
+          newbuildCount: 0,
+          uniqueLocationsCount: 0,
+          typeCounts: { poslovni: 0, zemljisca: 0, hise: 0, stanovanja: 0 },
+          actionCounts: {
+            poslovni: { prodaja: 0, oddaja: 0 },
+            zemljisca: { prodaja: 0, oddaja: 0 },
+            hise: { prodaja: 0, oddaja: 0 },
+            stanovanja: { prodaja: 0, oddaja: 0 },
+          },
+        });
+      }
+      return NextResponse.json([]);
     }
 
     const supabase = createClient(url, key);
@@ -235,7 +273,8 @@ export async function GET(request: Request) {
     query = query.order("posodobljeno_ob", { ascending: false, nullsFirst: false });
   }
 
-  const { data, error } = await query.limit(limit);
+  const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
+  const { data, error } = await query.range(offset, offset + limit - 1);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -264,20 +303,42 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: newbuildError.message }, { status: 500 });
     }
 
-    const { data: locations, error: locationsError } = await supabase
-      .from("nepremicnine_oglasi")
-      .select("location")
-      .not("location", "is", null);
+    const locationsResult = await fetchAllRows<Pick<RawListing, "location">>(
+      (from, to) =>
+        supabase
+          .from("nepremicnine_oglasi")
+          .select("location")
+          .not("location", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to)
+    );
 
-    if (locationsError) {
-      return NextResponse.json({ error: locationsError.message }, { status: 500 });
+    if (locationsResult.error) {
+      return NextResponse.json({ error: locationsResult.error }, { status: 500 });
     }
 
     const uniqueLocationsCount = new Set(
-      (locations || [])
+      locationsResult.rows
         .map((row) => row.location?.trim().toLowerCase())
         .filter((value): value is string => Boolean(value) && value !== "n/a")
     ).size;
+
+    // Fetch ALL valid listings to compute accurate type and action counts.
+    // The initial query is capped by the limit param (default 50), but stats
+    // must reflect the entire database to be meaningful.
+    const statsResult = await fetchAllRows<Pick<RawListing, "type" | "status">>(
+      (from, to) =>
+        supabase
+          .from("nepremicnine_oglasi")
+          .select("type, status")
+          .not("status", "eq", "potečeno")
+          .order("id", { ascending: true })
+          .range(from, to)
+    );
+
+    if (statsResult.error) {
+      return NextResponse.json({ error: statsResult.error }, { status: 500 });
+    }
 
     const typeCounts = { poslovni: 0, zemljisca: 0, hise: 0, stanovanja: 0 };
     const actionCounts = {
@@ -286,7 +347,7 @@ export async function GET(request: Request) {
       hise: { prodaja: 0, oddaja: 0 },
       stanovanja: { prodaja: 0, oddaja: 0 },
     };
-    for (const row of rows) {
+    for (const row of statsResult.rows) {
       const group = mapTypeGroup(row.type);
       typeCounts[group] += 1;
       const status = (row.status || "").toLowerCase();

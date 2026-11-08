@@ -19,7 +19,8 @@ interface Property {
   rooms: number;
   year: number;
   image: string;
-  link: string; // Povezava do izvorne strani agencije v bazi podatkov
+  link?: string | null; // Povezava do izvorne strani agencije v bazi podatkov
+  site?: string | null;
   badgeType: 'emerald' | 'slate' | 'amber' | 'indigo';
   badgeText: string;
   isPremium?: boolean;
@@ -118,8 +119,6 @@ export default function EstateMS() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [animateStats, setAnimateStats] = useState<boolean>(false);
-  
   const [typeCounts, setTypeCounts] = useState<TypeStats>({ poslovni: 0, zemljisca: 0, hise: 0, stanovanja: 0 });
   const [actionCounts, setActionCounts] = useState<ActionStats>({});
   const [activeAdsCount, setActiveAdsCount] = useState<number>(0);
@@ -166,7 +165,6 @@ export default function EstateMS() {
       }
     };
     fetchStats();
-    setAnimateStats(true);
   }, []);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
@@ -212,53 +210,53 @@ export default function EstateMS() {
     <div className="min-h-screen transition-colors duration-200 dark:bg-[#0f172a] dark:text-slate-100 bg-slate-100 text-slate-900">
       
       {/* ── HERO SECTION ── */}
-      <section className="relative overflow-hidden py-12 lg:py-28 px-4 sm:px-6 border-b dark:border-slate-800 border-slate-200 bg-gradient-to-b dark:from-[#0f172a] dark:to-[#111827] from-white to-slate-100">
+      <section className="relative overflow-hidden py-16 lg:py-32 px-4 sm:px-6 border-b dark:border-slate-800 border-slate-200 bg-gradient-to-b dark:from-[#0a0f1a] dark:to-[#0f172a] from-white to-slate-50">
         <div className="absolute inset-0 z-0 overflow-hidden">
-          <Image src="/hero.png" alt="" aria-hidden={true} priority fill className="object-cover opacity-30 scale-105" />
-          <div className="absolute inset-0 bg-black/20 dark:bg-black/40" />
+          <Image src="/hero.png" alt="" aria-hidden={true} priority fill className="object-cover opacity-20 scale-110" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/40 dark:from-black/40 dark:via-black/30 dark:to-black/50" />
         </div>
 
-        <div className="max-w-7xl mx-auto relative z-10 grid lg:grid-cols-12 gap-8 lg:gap-8 items-center justify-center">
+        <div className="max-w-7xl mx-auto relative z-10 grid lg:grid-cols-12 gap-10 lg:gap-12 items-center justify-center">
           <div className="lg:col-span-5 text-center lg:text-left flex flex-col items-center lg:items-start">
-            <div className="flex items-center gap-3 mb-5 justify-center lg:justify-start">
-              <span className="w-8 h-px bg-amber-400 hidden lg:block" />
-              <span className="text-amber-300 text-xs uppercase font-bold tracking-widest drop-shadow-lg">{t.portalLabel}</span>
+            <div className="flex items-center gap-3 mb-6 justify-center lg:justify-start">
+              <span className="w-10 h-px bg-amber-400" />
+              <span className="text-amber-300 text-[11px] uppercase font-bold tracking-[0.2em]">{t.portalLabel}</span>
             </div>
-            <h1 className="text-white drop-shadow-lg text-4xl sm:text-6xl lg:text-7xl font-semibold leading-[1.12] mb-6">
+            <h1 className="text-white text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] mb-6 tracking-tight">
               {t.heroTitle1}<br />
-              <em className="text-amber-400 not-italic font-semibold">{t.heroTitle2}</em><br />
+              <em className="text-amber-400 not-italic">{t.heroTitle2}</em><br />
               {t.heroTitle3}
             </h1>
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed max-w-md mb-8 mx-auto lg:mx-0">
+            <p className="text-white/60 text-sm sm:text-base leading-relaxed max-w-md mb-10 mx-auto lg:mx-0">
               {t.heroDesc}
             </p>
             
-            <div className="flex gap-4 sm:gap-6 border-t dark:border-slate-700 border-slate-200 pt-6 w-full max-w-sm justify-center lg:justify-start">
+            <div className="flex gap-8 border-t border-white/10 pt-7 w-full max-w-sm justify-center lg:justify-start">
               <div className="text-center lg:text-left">
-                <div className="text-white text-xl sm:text-2xl font-bold">
-                  {animateStats ? <CountUp end={activeAdsCount} duration={1.3} separator="." /> : 0}
+                <div className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+                  <CountUp end={activeAdsCount} duration={1.5} separator="." />
                 </div>
-                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">{t.activeAds}</div>
+                <div className="text-white/50 text-[10px] sm:text-[11px] uppercase font-bold tracking-[0.15em] mt-1">{t.activeAds}</div>
               </div>
-              <div className="w-px dark:bg-slate-700 bg-slate-200" />
+              <div className="w-px bg-white/10" />
               <div className="text-center lg:text-left">
-                <div className="text-white text-xl sm:text-2xl font-bold">
-                  {animateStats ? <CountUp end={newbuildCount} duration={1.3} separator="." /> : 0}
+                <div className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+                  <CountUp end={newbuildCount} duration={1.5} separator="." />
                 </div>
-                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">{t.newbuilds}</div>
+                <div className="text-white/50 text-[10px] sm:text-[11px] uppercase font-bold tracking-[0.15em] mt-1">{t.newbuilds}</div>
               </div>
-              <div className="w-px dark:bg-slate-700 bg-slate-200" />
+              <div className="w-px bg-white/10" />
               <div className="text-center lg:text-left">
-                <div className="text-white text-xl sm:text-2xl font-bold">
-                  {animateStats ? <CountUp end={regionsCount} duration={1.3} separator="." /> : 0}
+                <div className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+                  <CountUp end={regionsCount} duration={1.5} separator="." />
                 </div>
-                <div className="text-white/70 text-[10px] sm:text-[11px] uppercase font-bold tracking-wider mt-0.5">{t.locations}</div>
+                <div className="text-white/50 text-[10px] sm:text-[11px] uppercase font-bold tracking-[0.15em] mt-1">{t.locations}</div>
               </div>
             </div>
           </div>
 
           {/* Search card */}
-          <div className="lg:col-span-7 w-full max-w-xl mx-auto p-4 sm:p-6 md:p-9 rounded-2xl shadow-xl dark:bg-slate-900/95 dark:border dark:border-slate-700/80 bg-white border border-slate-200">
+          <div className="lg:col-span-7 w-full max-w-xl mx-auto p-5 sm:p-7 md:p-10 rounded-3xl shadow-2xl dark:bg-slate-900/95 dark:border dark:border-slate-700/50 bg-white border border-slate-200/80 backdrop-blur-sm">
             <div className="flex gap-1.5 border-b border-slate-200 dark:border-slate-700 pb-4 mb-6 overflow-x-auto no-scrollbar scrollbar-none snap-x">
               {searchTypeOptions.map((opt) => (
                 <button
@@ -336,25 +334,33 @@ export default function EstateMS() {
       </section>
 
       {/* ── KATEGORIJE TRGA ── */}
-      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24 bg-slate-300/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 mt-12">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-10 dark:text-white text-slate-900 text-center sm:text-left">{t.categoryTitle}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section id="type-offers" className="max-w-7xl mx-auto px-4 sm:px-6 py-20 scroll-mt-24 mt-16">
+        <div className="flex items-center gap-3 mb-3 justify-center sm:justify-start">
+          <span className="w-8 h-px bg-amber-400" />
+          <span className="text-amber-500 text-[11px] uppercase font-bold tracking-[0.2em]">{language === 'sl' ? 'Kategorije' : 'Categories'}</span>
+        </div>
+        <h2 className="text-3xl sm:text-4xl font-bold mb-12 dark:text-white text-slate-900 text-center sm:text-left tracking-tight">{t.categoryTitle}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {categoryItems.map((item) => {
             const typeMap: Record<string, string> = { poslovni: 'poslovni', zemljisca: 'zemljisce', hise: 'hisa', stanovanja: 'stanovanje' };
             const typeParam = typeMap[item.key] ?? '';
             return (
-              <div key={item.key} onClick={() => router.push(`/search?type=${typeParam}`)} className="cursor-pointer dark:bg-slate-900/60 dark:border-slate-800 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm transition-all duration-300 hover:scale-[1.03] hover:shadow-xl">
-                <div className="dark:text-slate-100 text-slate-800 text-xl font-semibold mb-3">{item.label}</div>
-                <div className="relative h-44 rounded-xl overflow-hidden mb-3">
-                  <Image src={item.img} alt={item.label} fill sizes="(max-width: 768px) 100vw, 25vw" className="object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="absolute bottom-3 left-3 text-white text-5xl font-bold">
-                    {animateStats ? <CountUp end={typeCounts[item.key as keyof TypeStats] || 0} duration={1.3} separator="." /> : 0}
+              <div key={item.key} onClick={() => router.push(`/search?type=${typeParam}`)} className="cursor-pointer group dark:bg-slate-900/50 dark:border-slate-800/80 bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:hover:shadow-amber-500/5">
+                <div className="relative h-48 overflow-hidden">
+                  <Image src={item.img} alt={item.label} fill sizes="(max-width: 768px) 100vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <div className="text-white text-4xl font-bold tracking-tight mb-1">
+                      <CountUp end={typeCounts[item.key as keyof TypeStats] || 0} duration={1.5} separator="." />
+                    </div>
+                    <div className="dark:text-slate-100 text-white text-lg font-semibold">{item.label}</div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Link href={`/search?type=${typeParam}&action=prodaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-rose-500/10 hover:bg-rose-500/20 rounded-lg py-2 text-xs font-semibold text-rose-500 transition-colors">{t.forSale} {actionCounts[item.key]?.prodaja ?? 0}</Link>
-                  <Link href={`/search?type=${typeParam}&action=oddaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg py-2 text-xs font-semibold text-emerald-500 transition-colors">{t.forRent} {actionCounts[item.key]?.oddaja ?? 0}</Link>
+                <div className="p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link href={`/search?type=${typeParam}&action=prodaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-rose-500/10 hover:bg-rose-500/15 rounded-xl py-2.5 text-xs font-semibold text-rose-500 transition-colors">{t.forSale} {actionCounts[item.key]?.prodaja ?? 0}</Link>
+                    <Link href={`/search?type=${typeParam}&action=oddaja`} onClick={(e) => e.stopPropagation()} className="block text-center bg-emerald-500/10 hover:bg-emerald-500/15 rounded-xl py-2.5 text-xs font-semibold text-emerald-500 transition-colors">{t.forRent} {actionCounts[item.key]?.oddaja ?? 0}</Link>
+                  </div>
                 </div>
               </div>
             );
@@ -363,10 +369,12 @@ export default function EstateMS() {
       </section>
 
       {/* ── PROPERTY GRID ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16 scroll-mt-24" id="listings">
-        <div className="flex items-center justify-between mb-10 text-center sm:text-left w-full">
-          <h2 className="text-3xl sm:text-4xl font-bold dark:text-white text-slate-900 w-full">{t.premiumTitle}</h2>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-20 scroll-mt-24" id="listings">
+        <div className="flex items-center gap-3 mb-3 justify-center sm:justify-start">
+          <span className="w-8 h-px bg-amber-400" />
+          <span className="text-amber-500 text-[11px] uppercase font-bold tracking-[0.2em]">{language === 'sl' ? 'Premium' : 'Premium'}</span>
         </div>
+        <h2 className="text-3xl sm:text-4xl font-bold mb-12 dark:text-white text-slate-900 text-center sm:text-left tracking-tight">{t.premiumTitle}</h2>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -384,58 +392,58 @@ export default function EstateMS() {
                 const isLiked = favorites.includes(property.id);
                 const isHighWeightPremium = property.weight >= 80 || property.isPremium;
                 
-                const destinationUrl = property.link || `/property/${property.id}`;
+                const destinationUrl = property.link || "/search";
                 const isExternal = !!property.link;
 
                 return (
                   <div 
                     key={property.id} 
-                    className={`rounded-3xl overflow-hidden border transition-all duration-300 group hover:-translate-y-1 hover:shadow-2xl bg-white dark:bg-slate-900/80 ${
-                      isHighWeightPremium ? 'border-amber-400/40 shadow-xl' : 'dark:border-slate-800/60 border-slate-200'
+                    className={`rounded-2xl overflow-hidden border transition-all duration-300 group hover:-translate-y-1.5 hover:shadow-2xl bg-white dark:bg-slate-900/60 ${
+                      isHighWeightPremium ? 'border-amber-400/30 shadow-lg shadow-amber-500/5' : 'dark:border-slate-800/50 border-slate-200/80'
                     }`}
                   >
-                    <div className="relative aspect-[16/10] overflow-hidden bg-slate-950">
+                    <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">
                       {property.image && (
                         <Image 
                           src={property.image} 
                           alt={property.title} 
                           fill 
                           sizes="(max-width: 768px) 100vw, 33vw" 
-                          className="object-cover transition-transform duration-500 group-hover:scale-105" 
+                          className="object-cover transition-transform duration-700 group-hover:scale-105" 
                         />
                       )}
                       <button 
                         onClick={(e) => toggleFavorite(property.id, e)} 
-                        className="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md w-10 h-10 rounded-2xl flex items-center justify-center text-base border border-white/10"
+                        className="absolute top-3 right-3 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md w-9 h-9 rounded-xl flex items-center justify-center text-sm border border-white/20 shadow-sm hover:scale-110 transition-transform"
                       >
                         {isLiked ? '❤️' : '♡'}
                       </button>
                       <div className="absolute bottom-3 left-3">
-                        <span className={`text-[11px] font-bold tracking-wider uppercase border rounded-md px-2.5 py-1 backdrop-blur-md ${getBadgeClass(property.badgeType)}`}>
+                        <span className={`text-[10px] font-bold tracking-wider uppercase rounded-lg px-2.5 py-1.5 backdrop-blur-md ${getBadgeClass(property.badgeType)}`}>
                           {property.filterTag === 'novogradnje' ? t.newbuild : property.badgeText}
                         </span>
                       </div>
                     </div>
 
-                    <div className="p-7">
-                      <div className="dark:text-amber-400 text-amber-600 text-xs font-bold tracking-wider uppercase mb-2">📍 {property.location}</div>
-                      <h3 className="dark:text-white text-slate-900 text-xl font-semibold leading-snug line-clamp-2 min-h-[56px] mb-5 group-hover:text-amber-500 transition-colors">
+                    <div className="p-5">
+                      <div className="dark:text-amber-400 text-amber-600 text-[11px] font-bold tracking-wider uppercase mb-1.5">📍 {property.location}</div>
+                      <h3 className="dark:text-white text-slate-900 text-lg font-semibold leading-snug line-clamp-2 min-h-[52px] mb-4 group-hover:text-amber-500 transition-colors">
                         {property.title}
                       </h3>
                       
-                      <div className="flex items-center justify-between border-t pt-4 text-xs font-medium dark:border-white/10 dark:text-white/60 border-slate-200 text-slate-600">
+                      <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3.5 text-[11px] font-medium dark:text-white/50 text-slate-500">
                         <span>📐 {property.area} m²</span>
                         <span>{property.priceUnit === 'per_m2' ? `${property.price} €/m²` : `${Math.round(property.price / (property.area || 1))} €/m²`}</span>
                         <span>🚪 {property.rooms} sob</span>
                       </div>
 
-                      <div className="flex items-center justify-between border-t mt-5 pt-5 dark:border-white/10 border-slate-200">
-                        <div className="text-2xl font-bold dark:text-white text-slate-900">{property.price.toLocaleString('sl-SI')} €</div>
+                      <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 mt-4 pt-4">
+                        <div className="text-xl font-bold dark:text-white text-slate-900 tracking-tight">{property.price.toLocaleString('sl-SI')} €</div>
                         <a 
                           href={destinationUrl} 
                           target={isExternal ? "_blank" : "_self"}
                           rel={isExternal ? "noopener noreferrer" : undefined}
-                          className="text-sm text-amber-400 font-semibold tracking-wider hover:underline"
+                          className="text-[11px] text-amber-500 font-bold tracking-wider hover:text-amber-400 transition-colors uppercase"
                         >
                           {t.details}
                         </a>
@@ -447,10 +455,10 @@ export default function EstateMS() {
             </div>
 
             {/* Show all button */}
-            <div className="flex justify-center mt-12 px-4">
+            <div className="flex justify-center mt-14 px-4">
               <Link
                 href="/search"
-                className="w-full sm:w-auto text-center bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold uppercase tracking-wider px-8 py-4 rounded-xl text-xs transition-all shadow-md hover:shadow-lg active:scale-98"
+                className="w-full sm:w-auto text-center bg-slate-900 dark:bg-amber-400 hover:bg-slate-800 dark:hover:bg-amber-300 text-white dark:text-slate-950 font-bold uppercase tracking-wider px-10 py-4 rounded-xl text-xs transition-all shadow-lg hover:shadow-xl active:scale-[0.98]"
               >
                 {t.showAll}
               </Link>
